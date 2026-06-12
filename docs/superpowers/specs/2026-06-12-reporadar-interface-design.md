@@ -1,11 +1,15 @@
 # RepoRadar 接口设计文档
 
-> 定义 Java 分析引擎与 Vue3 前端之间的数据契约。
+> 定义系统内三类接口的数据契约：
+> 1. **SSE 进度推送**（HTTP 接口，Java → 浏览器）— 使用 `code/msg/data` 标准格式
+> 2. **HTML 模板注入**（文件内嵌，Java → Vue3）— 裸 JSON，无包装
+> 3. **LLM API 调用**（出站 HTTP，Java → 外部 LLM）— 格式由提供商定义，本文仅定义 Prompt 输出约束
+>
 > 日期：2026-06-12
 
 ---
 
-## 1. 数据注入机制
+## 1. HTML 模板注入（非 HTTP）
 
 Java 将全部分析结果序列化为 JSON，替换 HTML 模板中的 `__INJECT_DATA__` 占位符：
 
@@ -15,22 +19,69 @@ Java 将全部分析结果序列化为 JSON，替换 HTML 模板中的 `__INJECT
 </script>
 ```
 
-Vue3 启动时读取 `window.__DATA__`，驱动全部渲染。**这是 Java 与 Vue3 之间的唯一数据通道，无 REST API。**
+Vue3 启动时读取 `window.__DATA__`，驱动全部渲染。
+
+**不使用 `code/msg/data` 包装**，原因：数据在文件生成时已写入，不存在"请求失败"的场景。
 
 ---
 
-## 2. SSE 事件接口
+## 2. SSE 进度推送接口（HTTP）
 
-Spring Boot 内嵌 HTTP Server 通过 `SseEmitter` 推送管线进度。
+**端点**：`GET /api/sse/progress`
 
-### 2.1 事件格式
+Spring Boot 内嵌 HTTP Server 通过 `SseEmitter` 推送管线进度。所有 SSE 事件均使用 `code/msg/data` 标准格式。
+
+### 2.1 通用响应格式
+
+```json
+{
+  "code": 0,
+  "msg": "success",
+  "data": { }
+}
+```
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `code` | `int` | 状态码，`0` 表示成功，非 `0` 表示错误 |
+| `msg` | `string` | 状态描述 |
+| `data` | `object?` | 业务数据，错误时为 `null` |
+
+### 2.2 错误码定义
+
+| code | 含义 |
+|---|---|
+| `0` | 成功 |
+| `1001` | 仓库地址无效或无法访问 |
+| `1002` | Git 克隆失败 |
+| `2001` | LLM API Key 无效 |
+| `2002` | LLM API 调用超时 |
+| `2003` | LLM 返回格式异常（降级处理，不中断流程） |
+| `3001` | 磁盘空间不足 |
+| `9999` | 未知错误 |
+
+### 2.3 进度事件
 
 ```
 event: progress
-data: {"stage":"CLONE","message":"正在克隆仓库...","percent":10}
+data: {"code":0,"msg":"success","data":{"stage":"CLONE","message":"正在克隆仓库...","percent":10}}
 ```
 
-### 2.2 阶段枚举与进度分配
+```java
+public record ApiResponse<T>(
+    int code,
+    String msg,
+    T data
+) {}
+
+public record SseProgressData(
+    String stage,    // 阶段枚举值
+    String message,  // 人类可读的进度描述
+    int percent      // 0-100
+) {}
+```
+
+### 2.4 阶段枚举与进度分配
 
 | 阶段 | 枚举值 | 进度范围 | 说明 |
 |---|---|---|---|
@@ -42,25 +93,43 @@ data: {"stage":"CLONE","message":"正在克隆仓库...","percent":10}
 | 全局洞察生成 | `LLM_REDUCE` | 75-85% | LLM Reduce 阶段（无 LLM 时跳过） |
 | 报告生成 | `REPORT` | 85-100% | 序列化 + 模板注入 |
 
-### 2.3 SSE 事件 DTO
+### 2.5 终止事件
 
-```java
-public record SseEvent(
-    String stage,    // 阶段枚举值
-    String message,  // 人类可读的进度描述
-    int percent      // 0-100
-) {}
-```
-
-### 2.4 终止事件
-
+**成功完成：**
 ```
 event: complete
-data: {"reportPath": "reports/reporadar-2024-01-25-143000.html"}
-
-event: error
-data: {"stage": "CLONE", "message": "仓库地址无法访问"}
+data: {"code":0,"msg":"分析完成","data":{"reportPath":"reports/reporadar-2024-01-25-143000.html"}}
 ```
+
+**运行错误：**
+```
+event: error
+data: {"code":1001,"msg":"仓库地址无法访问","data":{"stage":"CLONE"}}
+```
+
+**LLM 降级（不中断流程，后续阶段跳过）：**
+```
+event: progress
+data: {"code":2003,"msg":"LLM 返回格式异常，跳过语义分析","data":{"stage":"LLM_MAP","percent":55}}
+```
+
+---
+
+## 3. LLM API 调用（出站）
+
+### 3.1 调用协议
+
+遵循 OpenAI 兼容 API 格式（支持 DeepSeek、Ollama 等兼容服务）：
+
+```
+POST {base-url}/chat/completions
+Headers: Authorization: Bearer {api-key}
+Body: { "model": "{model-name}", "messages": [...], "temperature": 0.1 }
+```
+
+### 3.2 Prompt 输出约束（非 HTTP 接口定义）
+
+通过 system prompt 约束 LLM 输出格式，详见 [需求澄清文档](./2026-06-12-reporadar-prd-refinement-design.md) 第 3 节。Java 端对 LLM 返回做 JSON 反序列化容错处理，异常时降级而非中断
 
 ---
 
