@@ -22,6 +22,56 @@
 
 ---
 
+## Git 提交规范（必须遵守）
+
+**所有 commit message 必须使用中文，遵循 Conventional Commits 规范。**
+
+### 格式
+
+```
+<emoji> <type>(<scope>): <中文描述>
+```
+
+### 类型与 Emoji
+
+| Type | Emoji | 使用场景 |
+|---|---|---|
+| `feat` | ✨ | 新功能 |
+| `fix` | 🐛 | Bug 修复 |
+| `docs` | 📝 | 文档变更 |
+| `style` | 🎨 | 代码格式（不影响逻辑） |
+| `refactor` | ♻️ | 重构（非新功能非修复） |
+| `perf` | ⚡ | 性能优化 |
+| `test` | ✅ | 测试相关 |
+| `chore` | 🔧 | 构建/工具/配置变更 |
+
+### Scope 范围
+
+`git` | `anomaly` | `llm` | `report` | `sse` | `dto` | `cli` | `config` | `pipeline` | `全栈`
+
+### 规则
+
+1. **主题行不超过 50 个字符**，中文描述用祈使语气（"添加" 而非 "添加了"）
+2. **主题行末尾不加句号**
+3. **每个 commit 只做一件事** — 功能代码、测试代码、规范修复分开提交
+4. **禁止无意义的提交** — 不允许 "update"、"fix"、"wip" 等模糊描述
+5. **功能开发先测试后实现** — TDD 流程中测试提交和实现提交分开
+6. **规范修复单独提交** — `/review-standards` 的修复不与功能代码混在一起
+
+### 示例
+
+```
+✨ feat(git): 添加 Git 仓库克隆与自动清理
+🐛 fix(anomaly): 修复易挥发文件滑动窗口计算边界错误
+📝 docs: 更新接口设计文档 SSE 事件格式
+♻️ refactor(llm): 提取 JSON 解析逻辑为公共方法
+⚡ perf(metadata): 使用 Stream API 替代循环统计
+✅ test(anomaly): 添加模糊提交评分引擎单元测试
+🔧 chore: 初始化 Maven 项目结构与 Spring Boot 入口
+```
+
+---
+
 ## 编码规范（必须遵守）
 
 ### 一、命名规约（阿里巴巴）
