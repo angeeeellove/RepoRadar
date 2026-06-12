@@ -1,6 +1,9 @@
 package com.repordar.llm;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -24,6 +27,7 @@ public class LlmClient {
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(30);
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(120);
     private static final double TEMPERATURE = 0.1;
+    private static final int HTTP_OK = 200;
 
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
@@ -38,9 +42,9 @@ public class LlmClient {
     /**
      * 发送聊天请求到 OpenAI 兼容 API。
      *
-     * @param baseUrl API 基础 URL
-     * @param apiKey  API 密钥
-     * @param model   模型名称
+     * @param baseUrl  API 基础 URL
+     * @param apiKey   API 密钥
+     * @param model    模型名称
      * @param messages 消息列表
      * @return LLM 响应内容
      * @throws IOException 如果请求失败
@@ -63,12 +67,12 @@ public class LlmClient {
             HttpResponse<String> response = httpClient.send(request,
                     HttpResponse.BodyHandlers.ofString());
 
-            if (response.statusCode() != 200) {
+            if (response.statusCode() != HTTP_OK) {
                 throw new IOException("LLM API 返回错误: " + response.statusCode() + " " + response.body());
             }
 
             ChatResponse chatResponse = objectMapper.readValue(response.body(), ChatResponse.class);
-            return chatResponse.choices().get(0).message().content();
+            return chatResponse.getChoices().get(0).getMessage().getContent();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IOException("LLM 请求被中断", e);
@@ -82,7 +86,6 @@ public class LlmClient {
         if (url == null) {
             return "null";
         }
-        // 仅保留协议和主机，隐藏路径
         try {
             URI uri = URI.create(url);
             return uri.getScheme() + "://" + uri.getHost();
@@ -94,13 +97,25 @@ public class LlmClient {
     /**
      * 聊天请求 DTO。
      */
-    public record ChatRequest(String model, List<Message> messages, double temperature) {
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ChatRequest {
+        private String model;
+        private List<Message> messages;
+        private double temperature;
     }
 
     /**
      * 消息 DTO。
      */
-    public record Message(String role, String content) {
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Message {
+        private String role;
+        private String content;
+
         public static Message ofSystem(String content) {
             return new Message("system", content);
         }
@@ -113,12 +128,20 @@ public class LlmClient {
     /**
      * 聊天响应 DTO。
      */
-    public record ChatResponse(List<Choice> choices) {
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ChatResponse {
+        private List<Choice> choices;
     }
 
     /**
      * 选择项 DTO。
      */
-    public record Choice(Message message) {
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Choice {
+        private Message message;
     }
 }
