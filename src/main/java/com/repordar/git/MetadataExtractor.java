@@ -39,6 +39,8 @@ public class MetadataExtractor {
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
+    private static final String DEV_NULL = "/dev/null";
+
     private final ModuleDetector moduleDetector;
 
     public MetadataExtractor(ModuleDetector moduleDetector) {
@@ -152,9 +154,9 @@ public class MetadataExtractor {
                 String oldPath = diff.getOldPath();
 
                 // 记录变动的文件路径
-                if (!newPath.equals("/dev/null")) {
+                if (!DEV_NULL.equals(newPath)) {
                     changedFiles.add(newPath);
-                } else if (!oldPath.equals("/dev/null")) {
+                } else if (!DEV_NULL.equals(oldPath)) {
                     changedFiles.add(oldPath);
                 }
 

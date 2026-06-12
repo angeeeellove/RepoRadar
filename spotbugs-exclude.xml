@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!-- LLM 提示模板中的 \n 是发送给 API 的内容，不能使用平台相关的 %n -->
+    <Match>
+        <Bug code="VA_FORMAT_STRING_USES_NEWLINE"/>
+        <Class name="com.repordar.llm.LlmMapTranslator"/>
+    </Match>
+    <Match>
+        <Bug code="VA_FORMAT_STRING_USES_NEWLINE"/>
+        <Class name="com.repordar.llm.LlmReduceAnalyzer"/>
+    </Match>
+    <Match>
+        <Bug code="VA_FORMAT_STRING_USES_NEWLINE"/>
+        <Class name="com.repordar.llm.LlmVagueScanner"/>
+    </Match>
+    <!-- CLI 工具：用户通过命令行参数指定输出目录，路径遍历是预期行为 -->
+    <Match>
+        <Bug code="PATH_TRAVERSAL_IN"/>
+        <Class name="com.repordar.pipeline.AnalysisPipeline"/>
+    </Match>
+    <Match>
+        <Bug code="PATH_TRAVERSAL_IN"/>
+        <Class name="com.repordar.report.ReportGenerator"/>
+    </Match>
+    <Match>
+        <Bug code="PATH_TRAVERSAL_IN"/>
+        <Class name="com.repordar.cli.AnalyzeCommand"/>
+    </Match>
+</FindBugsFilter>

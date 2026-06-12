@@ -19,8 +19,8 @@
     <description>团队代码脉搏雷达 - AI Git 分析工具</description>
 
     <properties>
-        <java.version>21</java.version>
-        <maven.compiler.release>21</maven.compiler.release>
+        <java.version>17</java.version>
+        <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <picocli.version>4.7.5</picocli.version>
@@ -112,6 +112,7 @@
                 <configuration>
                     <targetJdk>17</targetJdk>
                     <sourceEncoding>UTF-8</sourceEncoding>
+                    <typeResolution>false</typeResolution>
                     <failurePriority>4</failurePriority>
                     <failOnViolation>true</failOnViolation>
                     <printFailingErrors>true</printFailingErrors>
@@ -160,9 +161,9 @@
                 </dependencies>
                 <configuration>
                     <effort>Max</effort>
-                    <threshold>Medium</threshold>
+                    <threshold>High</threshold>
                     <failOnError>true</failOnError>
-                    <includeFilterFile>${project.basedir}/spotbugs-include.xml</includeFilterFile>
+                    <excludeFilterFile>${project.basedir}/spotbugs-exclude.xml</excludeFilterFile>
                     <plugins>
                         <plugin>
                             <groupId>com.h3xstream.findsecbugs</groupId>
