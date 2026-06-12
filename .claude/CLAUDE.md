@@ -57,6 +57,7 @@
 4. **禁止无意义的提交** — 不允许 "update"、"fix"、"wip" 等模糊描述
 5. **功能开发先测试后实现** — TDD 流程中测试提交和实现提交分开
 6. **规范修复单独提交** — `/review-standards` 的修复不与功能代码混在一起
+7. **提交前必须通过代码扫描** — git pre-commit hook 自动运行 P3C + SpotBugs + find-sec-bugs，扫描不过禁止提交；跳过用 `--no-verify`（仅紧急情况）
 
 ### 示例
 

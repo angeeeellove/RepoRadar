@@ -1,0 +1,41 @@
+#!/bin/bash
+#
+# RepoRadar pre-commit hook
+# 提交前自动运行 P3C 规范扫描 + SpotBugs Bug/安全扫描
+# 跳过方式: git commit --no-verify
+#
+
+echo "🔍 运行代码质量扫描..."
+
+# 获取项目根目录（hook 工作目录是 git 根）
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+# 检测 JAVA_HOME
+if [ -z "$JAVA_HOME" ]; then
+    # 尝试常见路径
+    if [ -d "/c/Program Files/Java/jdk-21.0.10" ]; then
+        export JAVA_HOME="/c/Program Files/Java/jdk-21.0.10"
+    elif [ -d "/c/Program Files/Java/jdk-17" ]; then
+        export JAVA_HOME="/c/Program Files/Java/jdk-17"
+    fi
+fi
+
+cd "$PROJECT_DIR" || exit 1
+
+# P3C 规范扫描
+echo "  → P3C 阿里巴巴编码规范..."
+mvn pmd:check -q 2>&1
+if [ $? -ne 0 ]; then
+    echo "❌ P3C 规范扫描未通过！运行 'mvn pmd:pmd' 查看详情"
+    exit 1
+fi
+
+# SpotBugs + find-sec-bugs 扫描
+echo "  → SpotBugs Bug 检测 + 安全漏洞..."
+mvn spotbugs:check -q 2>&1
+if [ $? -ne 0 ]; then
+    echo "❌ SpotBugs 扫描未通过！运行 'mvn spotbugs:gui' 查看详情"
+    exit 1
+fi
+
+echo "✅ 代码质量扫描全部通过"
