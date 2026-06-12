@@ -1,9 +1,17 @@
 package com.repordar.dto;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.util.List;
 
-public record GlobalInsightDto(
-    String summary,
-    List<String> recommendations,
-    int healthScore
-) {}
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class GlobalInsightDto {
+
+    private String summary;
+    private List<String> recommendations;
+    private int healthScore;
+}

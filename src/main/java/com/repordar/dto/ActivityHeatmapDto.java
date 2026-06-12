@@ -1,8 +1,16 @@
 package com.repordar.dto;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.util.List;
 
-public record ActivityHeatmapDto(
-    List<HeatmapPoint> data,
-    int maxCount
-) {}
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class ActivityHeatmapDto {
+
+    private List<HeatmapPoint> data;
+    private int maxCount;
+}

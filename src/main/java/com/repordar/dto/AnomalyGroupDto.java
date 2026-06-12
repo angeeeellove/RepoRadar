@@ -1,10 +1,18 @@
 package com.repordar.dto;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.util.List;
 
-public record AnomalyGroupDto(
-    List<GiantCommitDto> giantCommits,
-    List<VolatileFileDto> volatileFiles,
-    List<CrossDomainCommitDto> crossDomainCommits,
-    List<VagueCommitDto> vagueCommits
-) {}
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class AnomalyGroupDto {
+
+    private List<GiantCommitDto> giantCommits;
+    private List<VolatileFileDto> volatileFiles;
+    private List<CrossDomainCommitDto> crossDomainCommits;
+    private List<VagueCommitDto> vagueCommits;
+}

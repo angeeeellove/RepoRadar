@@ -1,15 +1,21 @@
 package com.repordar.dto;
 
-import java.util.List;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-public record VagueCommitDto(
-    String hash,
-    String shortHash,
-    String author,
-    String authorEmail,
-    String date,
-    String message,
-    String vagueReason,
-    Integer score,
-    CommitAnalysisDto analysis
-) {}
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class VagueCommitDto {
+
+    private String hash;
+    private String shortHash;
+    private String author;
+    private String authorEmail;
+    private String date;
+    private String message;
+    private String vagueReason;
+    private Integer score;
+    private CommitAnalysisDto analysis;
+}

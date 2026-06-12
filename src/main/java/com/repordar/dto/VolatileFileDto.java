@@ -1,11 +1,19 @@
 package com.repordar.dto;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.util.List;
 
-public record VolatileFileDto(
-    String path,
-    int changeCount,
-    int windowDays,
-    List<String> contributors,
-    int linesChanged
-) {}
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class VolatileFileDto {
+
+    private String path;
+    private int changeCount;
+    private int windowDays;
+    private List<String> contributors;
+    private int linesChanged;
+}

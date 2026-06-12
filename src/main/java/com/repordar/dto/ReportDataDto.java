@@ -1,13 +1,21 @@
 package com.repordar.dto;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.util.List;
 
-public record ReportDataDto(
-    RepositoryInfoDto repository,
-    List<AuthorStatsDto> authors,
-    List<ModuleStatsDto> modules,
-    AnomalyGroupDto anomalies,
-    GlobalInsightDto globalInsight,
-    ActivityHeatmapDto activityHeatmap,
-    AnalysisMetaDto meta
-) {}
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class ReportDataDto {
+
+    private RepositoryInfoDto repository;
+    private List<AuthorStatsDto> authors;
+    private List<ModuleStatsDto> modules;
+    private AnomalyGroupDto anomalies;
+    private GlobalInsightDto globalInsight;
+    private ActivityHeatmapDto activityHeatmap;
+    private AnalysisMetaDto meta;
+}

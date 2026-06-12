@@ -1,3 +1,15 @@
 package com.repordar.dto;
 
-public record HeatmapPoint(int day, int hour, int count) {}
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class HeatmapPoint {
+
+    private int day;
+    private int hour;
+    private int count;
+}

@@ -1,11 +1,19 @@
 package com.repordar.dto;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.util.List;
 
-public record ModuleStatsDto(
-    String name,
-    int commitCount,
-    int linesChanged,
-    List<String> topContributors,
-    String insight
-) {}
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class ModuleStatsDto {
+
+    private String name;
+    private int commitCount;
+    private int linesChanged;
+    private List<String> topContributors;
+    private String insight;
+}

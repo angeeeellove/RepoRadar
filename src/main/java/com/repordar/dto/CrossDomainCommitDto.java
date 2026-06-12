@@ -1,15 +1,23 @@
 package com.repordar.dto;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.util.List;
 
-public record CrossDomainCommitDto(
-    String hash,
-    String shortHash,
-    String author,
-    String authorEmail,
-    String date,
-    String message,
-    List<String> modules,
-    int filesChanged,
-    CommitAnalysisDto analysis
-) {}
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class CrossDomainCommitDto {
+
+    private String hash;
+    private String shortHash;
+    private String author;
+    private String authorEmail;
+    private String date;
+    private String message;
+    private List<String> modules;
+    private int filesChanged;
+    private CommitAnalysisDto analysis;
+}

@@ -1,16 +1,24 @@
 package com.repordar.dto;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.util.List;
 
-public record GiantCommitDto(
-    String hash,
-    String shortHash,
-    String author,
-    String authorEmail,
-    String date,
-    String message,
-    int totalLines,
-    int filesChanged,
-    List<String> modules,
-    CommitAnalysisDto analysis
-) {}
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class GiantCommitDto {
+
+    private String hash;
+    private String shortHash;
+    private String author;
+    private String authorEmail;
+    private String date;
+    private String message;
+    private int totalLines;
+    private int filesChanged;
+    private List<String> modules;
+    private CommitAnalysisDto analysis;
+}

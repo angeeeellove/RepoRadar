@@ -1,9 +1,17 @@
 package com.repordar.dto;
 
-public record AnalysisMetaDto(
-    String analyzedAt,
-    boolean llmEnabled,
-    String llmModel,
-    long analysisDurationMs,
-    String version
-) {}
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class AnalysisMetaDto {
+
+    private String analyzedAt;
+    private boolean llmEnabled;
+    private String llmModel;
+    private long analysisDurationMs;
+    private String version;
+}
