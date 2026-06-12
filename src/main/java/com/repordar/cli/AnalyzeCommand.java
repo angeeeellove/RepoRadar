@@ -2,6 +2,7 @@ package com.repordar.cli;
 
 import com.repordar.config.AppProperties;
 import com.repordar.pipeline.AnalysisPipeline;
+import com.repordar.sse.SseProgressService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.SpringApplication;
 import org.springframework.context.ApplicationContext;
@@ -10,6 +11,8 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 
+import java.awt.Desktop;
+import java.net.URI;
 import java.util.concurrent.Callable;
 
 /**
@@ -55,10 +58,13 @@ public class AnalyzeCommand implements Callable<Integer> {
 
     private final ApplicationContext context;
     private final AppProperties props;
+    private final SseProgressService sseProgressService;
 
-    public AnalyzeCommand(ApplicationContext context, AppProperties props) {
+    public AnalyzeCommand(ApplicationContext context, AppProperties props,
+                          SseProgressService sseProgressService) {
         this.context = context;
         this.props = props;
+        this.sseProgressService = sseProgressService;
     }
 
     @Override
@@ -86,6 +92,22 @@ public class AnalyzeCommand implements Callable<Integer> {
         }
 
         try {
+            // 创建 SSE Emitter（浏览器连接后可接收实时进度）
+            sseProgressService.createEmitter();
+
+            // 自动打开浏览器
+            if (!noBrowser && Desktop.isDesktopSupported()) {
+                try {
+                    String url = "http://localhost:" + port;
+                    Desktop.getDesktop().browse(URI.create(url));
+                    log.info("已打开浏览器: {}", url);
+                    // 等待浏览器连接 SSE
+                    Thread.sleep(2000);
+                } catch (Exception e) {
+                    log.warn("无法打开浏览器: {}", e.getMessage());
+                }
+            }
+
             AnalysisPipeline pipeline = context.getBean(AnalysisPipeline.class);
             String reportPath = pipeline.execute(
                 repo, output, since, until, branch,
