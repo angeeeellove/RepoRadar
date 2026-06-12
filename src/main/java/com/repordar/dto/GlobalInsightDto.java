@@ -1,7 +1,7 @@
 package com.repordar.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -21,6 +21,6 @@ public class GlobalInsightDto {
 
     private String summary;
     private List<String> recommendations;
-    @JsonProperty("health_score")
+    @JsonAlias("health_score")
     private int healthScore;
 }

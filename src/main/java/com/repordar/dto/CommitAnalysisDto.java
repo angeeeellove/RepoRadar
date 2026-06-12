@@ -1,7 +1,7 @@
 package com.repordar.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -21,10 +21,10 @@ public class CommitAnalysisDto {
 
     private String intent;
     private List<String> tags;
-    @JsonProperty("risk_level")
+    @JsonAlias("risk_level")
     private String riskLevel;
-    @JsonProperty("message_quality")
+    @JsonAlias("message_quality")
     private String messageQuality;
-    @JsonProperty("quality_reason")
+    @JsonAlias("quality_reason")
     private String qualityReason;
 }
