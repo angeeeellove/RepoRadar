@@ -1,0 +1,43 @@
+# IDE - IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# IDE - Eclipse
+.project
+.classpath
+.settings/
+
+# IDE - VS Code
+.vscode/
+
+# Java 编译输出
+target/
+*.class
+
+# Maven
+*.jar
+*.war
+*.ear
+!repordar.jar
+
+# 日志文件
+*.log
+logs/
+
+# 操作系统
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# 临时文件
+*.swp
+*.swo
+*~
+*.tmp
+*.bak
+
+# 敏感配置（本地覆盖）
+*.local
+application-local.yml
