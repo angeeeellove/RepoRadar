@@ -1,7 +1,6 @@
 package com.repordar.anomaly;
 
 import com.repordar.git.CommitInfo;
-import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -11,7 +10,6 @@ import java.util.stream.Collectors;
  *
  * @author frank
  */
-@Component
 public class CrossDomainRule {
 
     private final int threshold;

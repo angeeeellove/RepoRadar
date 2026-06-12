@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.repordar.dto.ReportDataDto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -18,6 +19,7 @@ import java.time.format.DateTimeFormatter;
  *
  * @author frank
  */
+@Component
 public class ReportGenerator {
 
     private static final Logger log = LoggerFactory.getLogger(ReportGenerator.class);

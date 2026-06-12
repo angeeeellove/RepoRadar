@@ -4,7 +4,6 @@ import com.repordar.git.CommitInfo;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -17,7 +16,6 @@ import java.util.*;
  *
  * @author frank
  */
-@Component
 public class VolatileFileRule {
 
     private final int windowDays;

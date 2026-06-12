@@ -84,8 +84,6 @@ public class AnalyzeCommand implements Callable<Integer> {
             log.error("分析失败", e);
             System.err.println("❌ 分析失败: " + e.getMessage());
             return 2;
-        } finally {
-            SpringApplication.exit(context, () -> 0);
         }
     }
 
