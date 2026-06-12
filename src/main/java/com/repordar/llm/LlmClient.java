@@ -1,5 +1,6 @@
 package com.repordar.llm;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -131,6 +132,7 @@ public class LlmClient {
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class ChatResponse {
         private List<Choice> choices;
     }
@@ -141,6 +143,7 @@ public class LlmClient {
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Choice {
         private Message message;
     }
