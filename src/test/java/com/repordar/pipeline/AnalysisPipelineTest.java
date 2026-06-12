@@ -375,9 +375,9 @@ class AnalysisPipelineTest {
                                                      List<CommitInfo> vagueCommits) {
         try {
             Method method = AnalysisPipeline.class.getDeclaredMethod(
-                    "buildAnomalyGroup", AnomalyFilter.AnomalyResult.class, List.class, Map.class);
+                    "buildAnomalyGroup", AnomalyFilter.AnomalyResult.class, List.class, Map.class, Map.class);
             method.setAccessible(true);
-            return (AnomalyGroupDto) method.invoke(pipeline, anomalyResult, vagueCommits, Map.of());
+            return (AnomalyGroupDto) method.invoke(pipeline, anomalyResult, vagueCommits, Map.of(), Map.of());
         } catch (Exception e) {
             throw new RuntimeException("反射调用 buildAnomalyGroup 失败", e);
         }
@@ -398,11 +398,11 @@ class AnalysisPipelineTest {
             Method method = AnalysisPipeline.class.getDeclaredMethod(
                     "assembleReportData", String.class, String.class, String.class,
                     String.class, String.class, List.class,
-                    AnomalyFilter.AnomalyResult.class, List.class, Map.class,
+                    AnomalyFilter.AnomalyResult.class, List.class, Map.class, Map.class,
                     GlobalInsightDto.class, boolean.class, String.class, long.class);
             method.setAccessible(true);
             return (ReportDataDto) method.invoke(pipeline, repoName, repoUrl, branch,
-                    since, until, commits, anomalyResult, vagueCommits, Map.of(),
+                    since, until, commits, anomalyResult, vagueCommits, Map.of(), Map.of(),
                     insight, llmEnabled, llmModel, durationMs);
         } catch (Exception e) {
             throw new RuntimeException("反射调用 assembleReportData 失败", e);

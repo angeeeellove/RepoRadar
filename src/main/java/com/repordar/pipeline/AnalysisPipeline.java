@@ -155,7 +155,10 @@ public class AnalysisPipeline {
 
             // 阶段 5: 模糊提交检测
             sseProgressService.sendProgress("vague", "正在检测模糊提交...", 60);
-            List<CommitInfo> vagueCommits = vagueCommitDetector.detect(commits, llmEnabled, allModules, llmKey, llmUrl, llmModel);
+            VagueCommitDetector.DetectResult vagueResult =
+                    vagueCommitDetector.detect(commits, llmEnabled, allModules, llmKey, llmUrl, llmModel);
+            List<CommitInfo> vagueCommits = vagueResult.getCommits();
+            Map<String, String> vagueReasons = vagueResult.getReasons();
 
             // 阶段 6: LLM 语义分析（如果启用）
             GlobalInsightDto globalInsight;
@@ -178,7 +181,7 @@ public class AnalysisPipeline {
             String repoName = extractRepoName(repoRef);
             ReportDataDto reportData = assembleReportData(
                     repoName, repoRef, ref, since, until, commits,
-                    anomalyResult, vagueCommits, analysisMap, globalInsight,
+                    anomalyResult, vagueCommits, vagueReasons, analysisMap, globalInsight,
                     llmEnabled, llmModel, durationMs
             );
 
@@ -486,8 +489,10 @@ public class AnalysisPipeline {
      */
     AnomalyGroupDto buildAnomalyGroup(AnomalyFilter.AnomalyResult anomalyResult,
                                        List<CommitInfo> vagueCommits,
+                                       Map<String, String> vagueReasons,
                                        Map<String, CommitAnalysisDto> analysisMap) {
         Map<String, CommitAnalysisDto> safeMap = analysisMap != null ? analysisMap : Map.of();
+        Map<String, String> safeReasons = vagueReasons != null ? vagueReasons : Map.of();
 
         // 巨型提交
         List<GiantCommitDto> giantCommits = anomalyResult.getGiantCommits().stream()
@@ -504,9 +509,9 @@ public class AnalysisPipeline {
                 .map(c -> toCrossDomainCommitDto(c, safeMap.get(c.getHash())))
                 .collect(Collectors.toList());
 
-        // 模糊提交
+        // 模糊提交（优先使用 LLM 原因，否则用规则引擎）
         List<VagueCommitDto> vagueCommitDtos = vagueCommits.stream()
-                .map(c -> toVagueCommitDto(c, safeMap.get(c.getHash())))
+                .map(c -> toVagueCommitDto(c, safeReasons.get(c.getShortHash()), safeMap.get(c.getHash())))
                 .collect(Collectors.toList());
 
         return new AnomalyGroupDto(giantCommits, volatileFiles, crossDomainCommits, vagueCommitDtos);
@@ -535,10 +540,27 @@ public class AnalysisPipeline {
         );
     }
 
-    private VagueCommitDto toVagueCommitDto(CommitInfo c, CommitAnalysisDto analysis) {
-        com.repordar.anomaly.VagueScoringEngine engine = new com.repordar.anomaly.VagueScoringEngine();
-        int score = engine.score(c.getMessage());
-        String reason = engine.generateReason(c.getMessage(), score);
+    /**
+     * 转换模糊提交 DTO。
+     * 优先使用 LLM 的原因描述，无 LLM 结果时降级为规则评分。
+     *
+     * @param c         提交信息
+     * @param llmReason LLM 模糊原因（可为 null）
+     * @param analysis  LLM 语义分析结果（可为 null）
+     */
+    private VagueCommitDto toVagueCommitDto(CommitInfo c, String llmReason, CommitAnalysisDto analysis) {
+        String reason;
+        int score;
+        if (llmReason != null && !llmReason.isBlank()) {
+            // LLM 识别的模糊提交：使用 LLM 原因，标记为 LLM 检测（score = -1）
+            reason = "[LLM] " + llmReason;
+            score = -1;
+        } else {
+            // 规则引擎检测：使用评分引擎
+            com.repordar.anomaly.VagueScoringEngine engine = new com.repordar.anomaly.VagueScoringEngine();
+            score = engine.score(c.getMessage());
+            reason = engine.generateReason(c.getMessage(), score);
+        }
         return new VagueCommitDto(
                 c.getHash(), c.getShortHash(), c.getAuthor(), c.getAuthorEmail(),
                 c.getDate(), c.getMessage(), reason, score, analysis
@@ -555,6 +577,7 @@ public class AnalysisPipeline {
                                       List<CommitInfo> commits,
                                       AnomalyFilter.AnomalyResult anomalyResult,
                                       List<CommitInfo> vagueCommits,
+                                      Map<String, String> vagueReasons,
                                       Map<String, CommitAnalysisDto> analysisMap,
                                       GlobalInsightDto globalInsight,
                                       boolean llmEnabled, String llmModel,
@@ -575,7 +598,7 @@ public class AnalysisPipeline {
         // 统计数据
         List<AuthorStatsDto> authorStats = buildAuthorStats(commits);
         List<ModuleStatsDto> moduleStats = buildModuleStats(commits);
-        AnomalyGroupDto anomalyGroup = buildAnomalyGroup(anomalyResult, vagueCommits, analysisMap);
+        AnomalyGroupDto anomalyGroup = buildAnomalyGroup(anomalyResult, vagueCommits, vagueReasons, analysisMap);
         ActivityHeatmapDto heatmap = buildActivityHeatmap(commits);
 
         // 元信息

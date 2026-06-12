@@ -6,6 +6,7 @@ import com.repordar.llm.LlmVagueScanner;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -27,6 +28,27 @@ public class VagueCommitDetector {
     private final LlmVagueScanner llmVagueScanner;
 
     /**
+     * 检测结果，携带模糊提交列表和每条提交的模糊原因。
+     */
+    public static class DetectResult {
+        private final List<CommitInfo> commits;
+        private final Map<String, String> reasons;
+
+        public DetectResult(List<CommitInfo> commits, Map<String, String> reasons) {
+            this.commits = commits;
+            this.reasons = reasons;
+        }
+
+        public List<CommitInfo> getCommits() {
+            return commits;
+        }
+
+        public Map<String, String> getReasons() {
+            return reasons;
+        }
+    }
+
+    /**
      * 构造模糊提交检测器。
      *
      * @param scoringEngine    规则评分引擎（降级模式）
@@ -46,13 +68,13 @@ public class VagueCommitDetector {
      * @param llmKey      LLM API Key（可为 null）
      * @param llmUrl      LLM API URL（可为 null）
      * @param llmModel    LLM 模型名（可为 null）
-     * @return 模糊提交列表
+     * @return 检测结果（包含模糊提交列表和 hash→reason 映射）
      */
-    public List<CommitInfo> detect(List<CommitInfo> commits, boolean llmEnabled,
-                                   Set<String> moduleNames,
-                                   String llmKey, String llmUrl, String llmModel) {
+    public DetectResult detect(List<CommitInfo> commits, boolean llmEnabled,
+                               Set<String> moduleNames,
+                               String llmKey, String llmUrl, String llmModel) {
         if (commits.isEmpty()) {
-            return List.of();
+            return new DetectResult(List.of(), Map.of());
         }
 
         if (llmEnabled && llmVagueScanner != null && llmKey != null && !llmKey.isBlank()) {
@@ -69,8 +91,8 @@ public class VagueCommitDetector {
     /**
      * 使用 LLM 批量扫描模糊提交。
      */
-    private List<CommitInfo> detectWithLlm(List<CommitInfo> commits,
-                                           String llmKey, String llmUrl, String llmModel) {
+    private DetectResult detectWithLlm(List<CommitInfo> commits,
+                                       String llmKey, String llmUrl, String llmModel) {
         log.info("使用 LLM 扫描模糊提交: {} 条", commits.size());
 
         // 转换为 VagueCommitDto（仅填 shortHash + message）
@@ -86,28 +108,29 @@ public class VagueCommitDetector {
 
         if (results.isEmpty()) {
             log.info("LLM 未识别到模糊提交");
-            return List.of();
+            return new DetectResult(List.of(), Map.of());
         }
 
-        // 用 LLM 返回的 hash 过滤原始提交
-        Map<String, LlmVagueScanner.VagueResult> resultMap = results.stream()
+        // LLM 返回的 hash → reason 映射（key 为 shortHash）
+        Map<String, String> reasonMap = results.stream()
                 .collect(Collectors.toMap(
                         LlmVagueScanner.VagueResult::getHash,
-                        Function.identity(),
+                        LlmVagueScanner.VagueResult::getReason,
                         (a, b) -> a));
 
         List<CommitInfo> vagueCommits = commits.stream()
-                .filter(c -> resultMap.containsKey(c.getShortHash()))
+                .filter(c -> reasonMap.containsKey(c.getShortHash()))
                 .collect(Collectors.toList());
 
         log.info("LLM 识别到 {} 条模糊提交", vagueCommits.size());
-        return vagueCommits;
+        return new DetectResult(vagueCommits, reasonMap);
     }
 
     /**
      * 使用规则评分引擎检测模糊提交。
      */
-    private List<CommitInfo> detectWithScoringEngine(List<CommitInfo> commits, Set<String> moduleNames) {
-        return scoringEngine.scoreAndFilter(commits, moduleNames);
+    private DetectResult detectWithScoringEngine(List<CommitInfo> commits, Set<String> moduleNames) {
+        List<CommitInfo> vagueCommits = scoringEngine.scoreAndFilter(commits, moduleNames);
+        return new DetectResult(vagueCommits, Map.of());
     }
 }

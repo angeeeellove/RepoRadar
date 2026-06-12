@@ -30,25 +30,27 @@ class VagueCommitDetectorTest {
         CommitInfo clearCommit = createCommit("hash2", "Fix null pointer exception in UserService");
 
         // When: detect with LLM disabled
-        List<CommitInfo> result = detector.detect(
+        VagueCommitDetector.DetectResult result = detector.detect(
                 List.of(vagueCommit, clearCommit), false, Set.of("test"),
                 null, null, null);
 
         // Then: should detect vague commit ("优化了代码" matches VAGUE_PATTERNS, score < 50)
-        assertTrue(result.stream().anyMatch(c -> c.getHash().equals("hash1")));
-        assertFalse(result.stream().anyMatch(c -> c.getHash().equals("hash2")));
+        assertTrue(result.getCommits().stream().anyMatch(c -> c.getHash().equals("hash1")));
+        assertFalse(result.getCommits().stream().anyMatch(c -> c.getHash().equals("hash2")));
+        // Scoring engine mode: reasons map should be empty
+        assertTrue(result.getReasons().isEmpty());
     }
 
     @Test
     void shouldReturnEmptyListForEmptyCommits() {
         // Given: empty commit list
         // When: detect
-        List<CommitInfo> result = detector.detect(List.of(), false, Set.of(),
+        VagueCommitDetector.DetectResult result = detector.detect(List.of(), false, Set.of(),
                 null, null, null);
 
-        // Then: should return empty list
-        assertNotNull(result);
-        assertTrue(result.isEmpty());
+        // Then: should return empty
+        assertNotNull(result.getCommits());
+        assertTrue(result.getCommits().isEmpty());
     }
 
     @Test
@@ -57,12 +59,12 @@ class VagueCommitDetectorTest {
         CommitInfo commit = createCommit("hash1", "update");
 
         // When: detect with LLM enabled but no scanner
-        List<CommitInfo> result = detector.detect(
+        VagueCommitDetector.DetectResult result = detector.detect(
                 List.of(commit), true, Set.of("test"),
                 "fake-key", "http://fake-url", "fake-model");
 
-        // Then: should fallback to scoring engine and still return result
-        assertNotNull(result);
+        // Then: should fallback to scoring engine
+        assertNotNull(result.getCommits());
     }
 
     @Test
@@ -71,13 +73,13 @@ class VagueCommitDetectorTest {
         CommitInfo vagueCommit = createCommit("hash1", "优化了代码");
 
         // When: detect with LLM enabled but API key is null
-        List<CommitInfo> result = detector.detect(
+        VagueCommitDetector.DetectResult result = detector.detect(
                 List.of(vagueCommit), true, Set.of("test"),
                 null, "http://fake-url", "fake-model");
 
         // Then: should fallback to scoring engine
-        assertNotNull(result);
-        assertFalse(result.isEmpty());
+        assertNotNull(result.getCommits());
+        assertFalse(result.getCommits().isEmpty());
     }
 
     // Helper methods
