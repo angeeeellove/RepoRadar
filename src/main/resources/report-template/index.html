@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RepoRadar - 代码脉搏报告</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: #f8fafc; color: #1f2937; }
+    [v-cloak] { display: none; }
+
+    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; padding: 32px 24px; }
+    .header-inner { max-width: 1200px; margin: 0 auto; }
+    .header h1 { font-size: 24px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .header .version { font-size: 12px; background: rgba(255,255,255,.2); padding: 2px 8px; border-radius: 9999px; }
+    .header h2 { font-size: 20px; font-weight: 600; margin: 8px 0 4px; }
+    .header .meta-row { display: flex; flex-wrap: wrap; gap: 16px; font-size: 14px; color: rgba(255,255,255,.8); }
+    .header .llm-badge { background: rgba(255,255,255,.2); padding: 2px 10px; border-radius: 9999px; }
+
+    .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+    .section { background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 4px 12px rgba(0,0,0,.03); padding: 24px; margin-bottom: 20px; }
+    .section-title { font-size: 17px; font-weight: 700; color: #1f2937; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+
+    .cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-bottom: 20px; }
+    .card { background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 4px 12px rgba(0,0,0,.03); padding: 20px; text-align: center; }
+    .card .value { font-size: 32px; font-weight: 700; color: #1f2937; }
+    .card .label { font-size: 12px; color: #9ca3af; margin-top: 4px; }
+    .health-ring { width: 80px; height: 80px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 700; color: #fff; }
+    .health-high { background: linear-gradient(135deg, #34d399, #059669); }
+    .health-mid  { background: linear-gradient(135deg, #fbbf24, #d97706); }
+    .health-low  { background: linear-gradient(135deg, #f87171, #dc2626); }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; padding: 10px 12px; font-size: 12px; text-transform: uppercase; color: #9ca3af; border-bottom: 1px solid #f3f4f6; font-weight: 600; }
+    td { padding: 10px 12px; font-size: 14px; border-bottom: 1px solid #f9fafb; }
+    tr:hover td { background: #f9fafb; }
+
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 12px; font-weight: 500; }
+    .badge-red    { background: #fef2f2; color: #dc2626; }
+    .badge-yellow { background: #fffbeb; color: #d97706; }
+    .badge-green  { background: #f0fdf4; color: #16a34a; }
+    .badge-blue   { background: #eff6ff; color: #2563eb; }
+    .badge-purple { background: #f5f3ff; color: #7c3aed; }
+
+    .tab-bar { display: flex; border-bottom: 1px solid #e5e7eb; margin-bottom: 16px; }
+    .tab-btn { padding: 8px 16px; border: none; background: none; border-bottom: 2px solid transparent; cursor: pointer; font-size: 14px; color: #6b7280; font-family: inherit; }
+    .tab-btn:hover { color: #667eea; }
+    .tab-btn.active { color: #667eea; border-bottom-color: #667eea; font-weight: 600; }
+
+    .commit-row { border-left: 3px solid #e5e7eb; padding-left: 12px; margin-bottom: 14px; }
+    .commit-row:hover { border-left-color: #667eea; }
+    .commit-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 4px; }
+    .commit-meta code { font-size: 12px; background: #f3f4f6; padding: 2px 6px; border-radius: 4px; }
+    .commit-meta .date { font-size: 13px; color: #6b7280; }
+    .commit-msg { font-size: 14px; color: #374151; margin-bottom: 4px; }
+    .modules-row { display: flex; flex-wrap: wrap; gap: 4px; }
+    .analysis-box { margin-top: 8px; font-size: 12px; color: #6b7280; background: #f9fafb; padding: 6px 10px; border-radius: 6px; }
+
+    .empty-state { text-align: center; padding: 32px 16px; color: #9ca3af; font-size: 14px; }
+    .insight-text { color: #374151; line-height: 1.6; margin-bottom: 16px; }
+    .rec-list { list-style: none; }
+    .rec-list li { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; color: #4b5563; margin-bottom: 8px; }
+    .rec-list li::before { content: "•"; color: #8b5cf6; font-weight: bold; }
+
+    .footer { text-align: center; font-size: 12px; color: #9ca3af; padding: 16px 0; }
+    .footer p { margin-bottom: 2px; }
+
+    .text-green { color: #059669; }
+    .text-red { color: #dc2626; }
+    .text-orange { color: #ea580c; }
+    .text-sm { font-size: 13px; color: #6b7280; }
+    .text-xs { font-size: 12px; }
+    .font-mono { font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace; }
+    .font-bold { font-weight: 600; }
+
+    @media (max-width: 768px) {
+      .cards { grid-template-columns: repeat(3, 1fr); }
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div id="app" v-cloak>
+  <!-- Header -->
+  <div class="header">
+    <div class="header-inner">
+      <h1>📡 RepoRadar <span class="version">{{ meta.version }}</span></h1>
+      <h2>{{ repo.name }}</h2>
+      <div class="meta-row">
+        <span>🌿 {{ repo.branch }}</span>
+        <span v-if="repo.analysisPeriod">📅 {{ repo.analysisPeriod.since || '起始' }} ~ {{ repo.analysisPeriod.until || '最新' }}</span>
+        <span>⏱️ 耗时 {{ formatDuration(meta.analysisDurationMs) }}</span>
+        <span v-if="meta.llmEnabled" class="llm-badge">🤖 {{ meta.llmModel }}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- Overview Cards -->
+    <div class="cards">
+      <div class="card">
+        <div class="value">{{ repo.totalCommits }}</div>
+        <div class="label">总提交</div>
+      </div>
+      <div class="card">
+        <div class="value">{{ repo.totalAuthors }}</div>
+        <div class="label">贡献者</div>
+      </div>
+      <div class="card">
+        <div class="value">{{ repo.totalFiles }}</div>
+        <div class="label">文件数</div>
+      </div>
+      <div class="card">
+        <div class="value">{{ totalAnomalies }}</div>
+        <div class="label">异常检出</div>
+      </div>
+      <div class="card">
+        <div v-if="meta.llmEnabled && globalInsight && globalInsight.healthScore > 0" :class="healthClass" class="health-ring">{{ healthScore }}</div>
+        <div v-else class="health-ring" style="background:#e5e7eb;color:#6b7280;font-size:13px;width:100px;">需 LLM</div>
+        <div class="label">健康分</div>
+      </div>
+    </div>
+
+    <!-- Global Insight -->
+    <div v-if="meta.llmEnabled && globalInsight && globalInsight.healthScore > 0" class="section">
+      <div class="section-title">🧠 AI 洞察</div>
+      <p class="insight-text">{{ globalInsight.summary }}</p>
+      <div v-if="globalInsight.recommendations && globalInsight.recommendations.length">
+        <h4 style="font-size:14px;font-weight:600;color:#4b5563;margin-bottom:8px;">💡 建议</h4>
+        <ul class="rec-list">
+          <li v-for="(rec, i) in globalInsight.recommendations" :key="i">
+            <span>{{ rec }}</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+    <div v-else class="section">
+      <div class="section-title">🧠 AI 洞察</div>
+      <div class="empty-state">
+        <p style="font-size:16px;margin-bottom:8px;">🔒 未启用 LLM 语义分析</p>
+        <p style="font-size:13px;">使用 <code style="background:#f3f4f6;padding:2px 6px;border-radius:4px;">--llm-api-key</code> 和 <code style="background:#f3f4f6;padding:2px 6px;border-radius:4px;">--llm-model</code> 参数启用 AI 洞察与健康评分</p>
+        <p style="font-size:12px;color:#b0b8c4;margin-top:8px;">支持: DeepSeek / GPT / Claude / GLM / Qwen / Moonshot</p>
+      </div>
+    </div>
+
+    <!-- Author Contribution -->
+    <div class="section">
+      <div class="section-title">👥 贡献者分析</div>
+      <div class="grid-2">
+        <div id="author-chart" style="min-height:320px;"></div>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead>
+              <tr><th>贡献者</th><th>提交</th><th>+行</th><th>-行</th><th>模式</th><th>高峰</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="a in authors" :key="a.email">
+                <td class="font-bold">{{ a.name }}</td>
+                <td>{{ a.commitCount }}</td>
+                <td class="text-green">+{{ a.linesAdded }}</td>
+                <td class="text-red">-{{ a.linesDeleted }}</td>
+                <td><span class="badge badge-blue">{{ a.profile }}</span></td>
+                <td class="text-sm">{{ a.peakHours }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Activity Heatmap -->
+    <div class="section">
+      <div class="section-title">🗓️ 活跃热力图</div>
+      <div id="heatmap-chart" style="min-height:300px;"></div>
+    </div>
+
+    <!-- Module Stats -->
+    <div v-if="modules.length" class="section">
+      <div class="section-title">📦 模块统计</div>
+      <div class="grid-2">
+        <div id="module-chart" style="min-height:320px;"></div>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead>
+              <tr><th>模块</th><th>提交</th><th>变更行</th><th>主要贡献者</th><th v-if="hasModuleInsight">洞察</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="m in modules" :key="m.name">
+                <td class="font-bold">{{ m.name }}</td>
+                <td>{{ m.commitCount }}</td>
+                <td>{{ m.linesChanged }}</td>
+                <td>
+                  <span v-for="c in m.topContributors" :key="c" class="badge badge-blue" style="margin-right:4px;">{{ c }}</span>
+                </td>
+                <td v-if="hasModuleInsight" class="text-sm">{{ m.insight || '-' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Anomaly Detection -->
+    <div class="section">
+      <div class="section-title">⚠️ 异常检测</div>
+      <div class="tab-bar">
+        <button :class="['tab-btn', anomalyTab === 'giant' ? 'active' : '']" @click="anomalyTab='giant'">
+          巨型提交 <span class="badge badge-red">{{ anomalies.giantCommits.length }}</span>
+        </button>
+        <button :class="['tab-btn', anomalyTab === 'volatile' ? 'active' : '']" @click="anomalyTab='volatile'">
+          易挥发文件 <span class="badge badge-yellow">{{ anomalies.volatileFiles.length }}</span>
+        </button>
+        <button :class="['tab-btn', anomalyTab === 'cross' ? 'active' : '']" @click="anomalyTab='cross'">
+          跨域提交 <span class="badge badge-red">{{ anomalies.crossDomainCommits.length }}</span>
+        </button>
+        <button :class="['tab-btn', anomalyTab === 'vague' ? 'active' : '']" @click="anomalyTab='vague'">
+          模糊提交 <span class="badge badge-yellow">{{ anomalies.vagueCommits.length }}</span>
+        </button>
+      </div>
+
+      <!-- Giant Commits -->
+      <div v-if="anomalyTab === 'giant'">
+        <div v-if="!anomalies.giantCommits.length" class="empty-state">✅ 未检测到巨型提交</div>
+        <div v-for="c in anomalies.giantCommits" :key="c.hash" class="commit-row">
+          <div class="commit-meta">
+            <code>{{ c.shortHash }}</code>
+            <span class="date">{{ c.author }} · {{ c.date }}</span>
+            <span class="badge badge-red">{{ c.totalLines }} 行</span>
+            <span class="badge badge-yellow">{{ c.filesChanged }} 文件</span>
+          </div>
+          <p class="commit-msg">{{ c.message }}</p>
+          <div class="modules-row">
+            <span v-for="mod in c.modules" :key="mod" class="badge badge-blue">{{ mod }}</span>
+          </div>
+          <div v-if="c.analysis" class="analysis-box">
+            <span v-if="c.analysis.intent">意图: {{ c.analysis.intent }}</span>
+            <span v-if="c.analysis.riskLevel" style="margin-left:12px;">风险: {{ c.analysis.riskLevel }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Volatile Files -->
+      <div v-if="anomalyTab === 'volatile'">
+        <div v-if="!anomalies.volatileFiles.length" class="empty-state">✅ 未检测到易挥发文件</div>
+        <table v-else>
+          <thead><tr><th>文件路径</th><th>变更次数</th><th>窗口(天)</th><th>变更行</th><th>贡献者</th></tr></thead>
+          <tbody>
+            <tr v-for="f in anomalies.volatileFiles" :key="f.path">
+              <td class="font-mono text-sm">{{ f.path }}</td>
+              <td><span class="badge badge-yellow">{{ f.changeCount }}</span></td>
+              <td>{{ f.windowDays }}</td>
+              <td>{{ f.linesChanged }}</td>
+              <td>
+                <span v-for="c in f.contributors" :key="c" class="badge badge-blue" style="margin-right:4px;">{{ c }}</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Cross Domain Commits -->
+      <div v-if="anomalyTab === 'cross'">
+        <div v-if="!anomalies.crossDomainCommits.length" class="empty-state">✅ 未检测到跨域提交</div>
+        <div v-for="c in anomalies.crossDomainCommits" :key="c.hash" class="commit-row">
+          <div class="commit-meta">
+            <code>{{ c.shortHash }}</code>
+            <span class="date">{{ c.author }} · {{ c.date }}</span>
+            <span class="badge badge-red">{{ c.modules.length }} 模块</span>
+            <span class="badge badge-yellow">{{ c.filesChanged }} 文件</span>
+          </div>
+          <p class="commit-msg">{{ c.message }}</p>
+          <div class="modules-row">
+            <span v-for="mod in c.modules" :key="mod" class="badge badge-blue">{{ mod }}</span>
+          </div>
+          <div v-if="c.analysis" class="analysis-box">
+            <span v-if="c.analysis.intent">意图: {{ c.analysis.intent }}</span>
+            <span v-if="c.analysis.riskLevel" style="margin-left:12px;">风险: {{ c.analysis.riskLevel }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Vague Commits -->
+      <div v-if="anomalyTab === 'vague'">
+        <div v-if="!anomalies.vagueCommits.length" class="empty-state">✅ 未检测到模糊提交</div>
+        <div v-for="c in anomalies.vagueCommits" :key="c.hash" class="commit-row">
+          <div class="commit-meta">
+            <code>{{ c.shortHash }}</code>
+            <span class="date">{{ c.author }} · {{ c.date }}</span>
+            <span class="badge badge-yellow">评分 {{ c.score }}</span>
+          </div>
+          <p class="commit-msg">{{ c.message }}</p>
+          <p class="text-orange text-xs">{{ c.vagueReason }}</p>
+          <div v-if="c.analysis" class="analysis-box">
+            <span v-if="c.analysis.messageQuality">质量: {{ c.analysis.messageQuality }}</span>
+            <span v-if="c.analysis.qualityReason" style="margin-left:12px;">{{ c.analysis.qualityReason }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p>RepoRadar {{ meta.version }} · 分析于 {{ meta.analyzedAt }}</p>
+      <p v-if="meta.llmEnabled">🤖 语义分析: {{ meta.llmModel }} · 耗时 {{ formatDuration(meta.analysisDurationMs) }}</p>
+      <p v-else>纯规则分析 · 耗时 {{ formatDuration(meta.analysisDurationMs) }}</p>
+    </div>
+  </div>
+</div>
+
+<script>
+// 数据通过模板注入，无 HTTP 请求，无跨域问题
+const DATA = __INJECT_DATA__;
+
+const { createApp } = Vue;
+
+createApp({
+  data() {
+    return {
+      repo: DATA.repository || {},
+      authors: DATA.authors || [],
+      modules: DATA.modules || [],
+      anomalies: DATA.anomalies || { giantCommits: [], volatileFiles: [], crossDomainCommits: [], vagueCommits: [] },
+      globalInsight: DATA.globalInsight || null,
+      meta: DATA.meta || {},
+      anomalyTab: 'giant'
+    };
+  },
+  computed: {
+    totalAnomalies() {
+      var a = this.anomalies;
+      return (a.giantCommits ? a.giantCommits.length : 0)
+           + (a.volatileFiles ? a.volatileFiles.length : 0)
+           + (a.crossDomainCommits ? a.crossDomainCommits.length : 0)
+           + (a.vagueCommits ? a.vagueCommits.length : 0);
+    },
+    healthScore() {
+      if (!this.globalInsight) return '--';
+      return this.globalInsight.healthScore;
+    },
+    healthClass() {
+      var s = this.globalInsight ? this.globalInsight.healthScore : 0;
+      if (s >= 80) return 'health-high';
+      if (s >= 50) return 'health-mid';
+      return 'health-low';
+    },
+    hasModuleInsight() {
+      return this.modules.some(function(m) { return m.insight; });
+    }
+  },
+  methods: {
+    formatDuration: function(ms) {
+      if (!ms) return '0ms';
+      if (ms < 1000) return ms + 'ms';
+      return (ms / 1000).toFixed(1) + 's';
+    },
+    renderAuthorChart: function() {
+      if (!this.authors.length) return;
+      var el = document.getElementById('author-chart');
+      if (!el) return;
+      var chart = echarts.init(el);
+      chart.setOption({
+        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+        legend: { data: ['提交数', '新增行', '删除行'] },
+        grid: { left: 60, right: 20, top: 40, bottom: 30 },
+        xAxis: { type: 'category', data: this.authors.map(function(a) { return a.name; }) },
+        yAxis: { type: 'value' },
+        series: [
+          { name: '提交数', type: 'bar', data: this.authors.map(function(a) { return a.commitCount; }), itemStyle: { color: '#667eea' } },
+          { name: '新增行', type: 'bar', data: this.authors.map(function(a) { return a.linesAdded; }), itemStyle: { color: '#34d399' } },
+          { name: '删除行', type: 'bar', data: this.authors.map(function(a) { return a.linesDeleted; }), itemStyle: { color: '#f87171' } }
+        ]
+      });
+      window.addEventListener('resize', function() { chart.resize(); });
+    },
+    renderHeatmap: function() {
+      var heatmap = DATA.activityHeatmap;
+      if (!heatmap || !heatmap.data || !heatmap.data.length) return;
+      var el = document.getElementById('heatmap-chart');
+      if (!el) return;
+      var chart = echarts.init(el);
+      var days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+      var hours = [];
+      for (var i = 0; i < 24; i++) hours.push(i + ':00');
+      chart.setOption({
+        tooltip: {
+          formatter: function(p) {
+            if (!p.data) return '';
+            return days[p.data[0]] + ' ' + hours[p.data[1]] + '<br/>提交: ' + p.data[2] + ' 次';
+          }
+        },
+        grid: { left: 60, right: 20, top: 10, bottom: 40 },
+        xAxis: { type: 'category', data: hours, splitArea: { show: true } },
+        yAxis: { type: 'category', data: days, splitArea: { show: true } },
+        visualMap: {
+          min: 0, max: Math.max(heatmap.maxCount || 10, 1),
+          calculable: true, orient: 'horizontal', left: 'center', bottom: 0,
+          inRange: { color: ['#e0e7ff', '#818cf8', '#4f46e5'] }
+        },
+        series: [{
+          type: 'heatmap',
+          data: heatmap.data.map(function(p) { return [p.day, p.hour, p.count]; }),
+          label: { show: false },
+          emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.3)' } }
+        }]
+      });
+      window.addEventListener('resize', function() { chart.resize(); });
+    },
+    renderModuleChart: function() {
+      if (!this.modules.length) return;
+      var el = document.getElementById('module-chart');
+      if (!el) return;
+      var chart = echarts.init(el);
+      chart.setOption({
+        tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+        series: [{
+          type: 'pie',
+          radius: ['35%', '65%'],
+          center: ['50%', '50%'],
+          avoidLabelOverlap: true,
+          itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
+          label: {
+            show: true,
+            formatter: '{b}: {c}',
+            fontSize: 12,
+            lineHeight: 16
+          },
+          labelLine: { length: 10, length2: 8 },
+          data: this.modules.map(function(m) { return { name: m.name, value: m.commitCount }; })
+        }],
+        color: ['#667eea', '#34d399', '#fbbf24', '#f87171', '#a78bfa', '#fb923c', '#22d3ee']
+      });
+      window.addEventListener('resize', function() { chart.resize(); });
+    }
+  },
+  mounted: function() {
+    var self = this;
+    this.$nextTick(function() {
+      self.renderAuthorChart();
+      self.renderHeatmap();
+      self.renderModuleChart();
+    });
+  }
+}).mount('#app');
+</script>
+</body>
+</html>
