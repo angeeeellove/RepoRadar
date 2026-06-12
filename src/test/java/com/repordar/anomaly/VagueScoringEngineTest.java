@@ -52,6 +52,20 @@ class VagueScoringEngineTest {
     }
 
     @Test
+    void shouldPenalizeEnglishSingleWordVague() {
+        assertTrue(engine.score("fix") < 50, "'fix' alone should be vague");
+        assertTrue(engine.score("update") < 50, "'update' alone should be vague");
+        assertTrue(engine.score("wip") < 50, "'wip' alone should be vague");
+        assertTrue(engine.score("temp") < 50, "'temp' alone should be vague");
+    }
+
+    @Test
+    void shouldNotPenalizeEnglishWithSpecificContent() {
+        int score = engine.score("fix: resolve race condition in payment flow");
+        assertTrue(score >= 50, "Specific fix should not be vague, got: " + score);
+    }
+
+    @Test
     void shouldHandleNullMessage() {
         assertEquals(0, engine.score(null));
     }

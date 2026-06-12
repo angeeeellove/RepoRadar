@@ -231,6 +231,12 @@ class AnalysisPipelineTest {
         assertNotNull(group.getCrossDomainCommits());
         assertNotNull(group.getVagueCommits());
         assertEquals(1, group.getVagueCommits().size());
+        // 检测标准说明应已填充
+        assertNotNull(group.getGiantCriteria());
+        assertNotNull(group.getVolatileCriteria());
+        assertNotNull(group.getCrossDomainCriteria());
+        assertNotNull(group.getVagueCriteria());
+        assertFalse(group.getGiantCriteria().isEmpty());
     }
 
     // ==================== 完整报告数据组装测试 ====================
@@ -280,7 +286,8 @@ class AnalysisPipelineTest {
         data.setAuthors(Collections.emptyList());
         data.setModules(Collections.emptyList());
         data.setAnomalies(new AnomalyGroupDto(Collections.emptyList(), Collections.emptyList(),
-                Collections.emptyList(), Collections.emptyList()));
+                Collections.emptyList(), Collections.emptyList(),
+                "测试标准", "测试标准", "测试标准", "测试标准"));
         data.setGlobalInsight(new GlobalInsightDto("总结", Collections.emptyList(), 80));
         data.setActivityHeatmap(new ActivityHeatmapDto(Collections.emptyList(), 0));
         data.setMeta(new AnalysisMetaDto("2024-01-01T00:00:00", false, "", 1000L, "1.0.0"));
@@ -375,9 +382,9 @@ class AnalysisPipelineTest {
                                                      List<CommitInfo> vagueCommits) {
         try {
             Method method = AnalysisPipeline.class.getDeclaredMethod(
-                    "buildAnomalyGroup", AnomalyFilter.AnomalyResult.class, List.class, Map.class, Map.class);
+                    "buildAnomalyGroup", AnomalyFilter.AnomalyResult.class, List.class, Map.class, Map.class, boolean.class);
             method.setAccessible(true);
-            return (AnomalyGroupDto) method.invoke(pipeline, anomalyResult, vagueCommits, Map.of(), Map.of());
+            return (AnomalyGroupDto) method.invoke(pipeline, anomalyResult, vagueCommits, Map.of(), Map.of(), false);
         } catch (Exception e) {
             throw new RuntimeException("反射调用 buildAnomalyGroup 失败", e);
         }

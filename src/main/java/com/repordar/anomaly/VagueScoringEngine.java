@@ -33,6 +33,12 @@ public class VagueScoringEngine {
     private static final Set<String> VAGUE_PATTERNS = Set.of(
             "优化了代码", "修复问题", "小改动", "调整代码", "优化", "调整", "修复"
     );
+
+    /** 英文单单词模糊提交（极其模糊，只有动词没有宾语） */
+    private static final Set<String> SINGLE_WORD_VAGUE_EN = Set.of(
+            "update", "fix", "wip", "temp", "done", "minor", "changes", "cleanup",
+            "misc", "other", "test", "debug", "refactor", "change", "modify"
+    );
     private static final Pattern ISSUE_REF = Pattern.compile("#\\d+|[A-Z]+-\\d+");
     private static final Pattern ERROR_CODE = Pattern.compile(
             "[A-Z][a-z]*Exception|OOM|NPE|ERR[-_]?\\d+", Pattern.CASE_INSENSITIVE
@@ -134,8 +140,13 @@ public class VagueScoringEngine {
             }
         }
 
-        // 加分项：引用具体模块名
+        // 减分项：英文单单词提交（只有动词没有宾语，极其模糊）
         String lowerDesc = description.toLowerCase();
+        if (SINGLE_WORD_VAGUE_EN.contains(lowerDesc)) {
+            score -= 55;
+        }
+
+        // 加分项：引用具体模块名（复用上面的 lowerDesc）
         for (String mod : repoModuleNames) {
             if (lowerDesc.contains(mod.toLowerCase())) {
                 score += 15;
@@ -185,6 +196,10 @@ public class VagueScoringEngine {
             if (desc.equals(pattern)) {
                 reason.append("匹配已知模糊模式\"").append(pattern).append("\"；");
             }
+        }
+
+        if (SINGLE_WORD_VAGUE_EN.contains(desc.toLowerCase())) {
+            reason.append("英文单单词提交，缺少具体描述；");
         }
 
         if (reason.isEmpty()) {

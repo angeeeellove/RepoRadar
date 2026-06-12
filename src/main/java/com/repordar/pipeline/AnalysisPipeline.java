@@ -118,12 +118,12 @@ public class AnalysisPipeline {
                 repoRef, branch, since, until, llmEnabled);
 
         // 阶段 1: 克隆/打开仓库
-        sseProgressService.sendProgress("clone", "正在克隆仓库...", 10);
+        sseProgressService.sendProgress("CLONE", "正在克隆仓库...", 10);
         GitCloner.ClonedRepo clonedRepo = gitCloner.cloneOrOpen(repoRef);
 
         try {
             // 阶段 2: 提取元数据
-            sseProgressService.sendProgress("metadata", "正在提取提交元数据...", 30);
+            sseProgressService.sendProgress("METADATA", "正在提取提交元数据...", 30);
             String ref = (branch != null && !branch.trim().isEmpty()) ? branch : DEFAULT_BRANCH;
             List<CommitInfo> allCommits = metadataExtractor.extract(clonedRepo.getRepository(), ref);
 
@@ -134,7 +134,7 @@ public class AnalysisPipeline {
             }
 
             // 阶段 3: 日期过滤
-            sseProgressService.sendProgress("filter", "正在按日期过滤...", 40);
+            sseProgressService.sendProgress("FILTER", "正在按日期过滤...", 40);
             List<CommitInfo> commits = filterByDate(allCommits, since, until);
             log.info("日期过滤: {} → {} 条提交", allCommits.size(), commits.size());
 
@@ -150,11 +150,11 @@ public class AnalysisPipeline {
                     .collect(Collectors.toSet());
 
             // 阶段 4: 异常检测
-            sseProgressService.sendProgress("anomaly", "正在检测异常提交...", 50);
+            sseProgressService.sendProgress("ANOMALY", "正在检测异常提交...", 50);
             AnomalyFilter.AnomalyResult anomalyResult = anomalyFilter.detect(commits);
 
             // 阶段 5: 模糊提交检测
-            sseProgressService.sendProgress("vague", "正在检测模糊提交...", 60);
+            sseProgressService.sendProgress("LLM_VAGUE", "正在检测模糊提交...", 55);
             VagueCommitDetector.DetectResult vagueResult =
                     vagueCommitDetector.detect(commits, llmEnabled, allModules, llmKey, llmUrl, llmModel);
             List<CommitInfo> vagueCommits = vagueResult.getCommits();
@@ -164,10 +164,12 @@ public class AnalysisPipeline {
             GlobalInsightDto globalInsight;
             Map<String, CommitAnalysisDto> analysisMap;
             if (llmEnabled) {
-                sseProgressService.sendProgress("llm", "正在进行 LLM 语义分析...", 70);
                 // Map 阶段：逐提交语义分析
                 analysisMap = runLlmMapPhase(anomalyResult, vagueCommits, llmKey, llmUrl, llmModel);
+                // 自校验：移除 Map 分析质量为 EXCELLENT/HIGH 的误判模糊提交
+                vagueCommits = filterFalsePositiveVague(vagueCommits, vagueReasons, analysisMap);
                 // Reduce 阶段：生成全局洞察
+                sseProgressService.sendProgress("LLM_REDUCE", "生成全局洞察...", 80);
                 globalInsight = runLlmReduce(commits, analysisMap, llmKey, llmUrl, llmModel);
             } else {
                 globalInsight = createDefaultInsight();
@@ -175,7 +177,7 @@ public class AnalysisPipeline {
             }
 
             // 阶段 7: 构建统计数据并组装报告
-            sseProgressService.sendProgress("report", "正在生成报告...", 85);
+            sseProgressService.sendProgress("REPORT", "正在生成报告...", 85);
             long durationMs = System.currentTimeMillis() - startTime;
 
             String repoName = extractRepoName(repoRef);
@@ -485,12 +487,14 @@ public class AnalysisPipeline {
      * @param anomalyResult 异常检测结果
      * @param vagueCommits  模糊提交列表
      * @param analysisMap   LLM 分析结果（key=commit hash），可为空 map
+     * @param llmEnabled    是否启用 LLM（影响模糊提交标准描述）
      * @return 异常分组 DTO
      */
     AnomalyGroupDto buildAnomalyGroup(AnomalyFilter.AnomalyResult anomalyResult,
                                        List<CommitInfo> vagueCommits,
                                        Map<String, String> vagueReasons,
-                                       Map<String, CommitAnalysisDto> analysisMap) {
+                                       Map<String, CommitAnalysisDto> analysisMap,
+                                       boolean llmEnabled) {
         Map<String, CommitAnalysisDto> safeMap = analysisMap != null ? analysisMap : Map.of();
         Map<String, String> safeReasons = vagueReasons != null ? vagueReasons : Map.of();
 
@@ -514,7 +518,18 @@ public class AnalysisPipeline {
                 .map(c -> toVagueCommitDto(c, safeReasons.get(c.getShortHash()), safeMap.get(c.getHash())))
                 .collect(Collectors.toList());
 
-        return new AnomalyGroupDto(giantCommits, volatileFiles, crossDomainCommits, vagueCommitDtos);
+        // 检测标准说明
+        AppProperties.Anomaly anomaly = appProperties.getAnomaly();
+        String giantCriteria = "单次提交总变动行数超过 " + anomaly.getGiantCommitThreshold() + " 行";
+        String volatileCriteria = anomaly.getVolatileWindowDays() + " 天内修改超过 "
+                + anomaly.getVolatileThreshold() + " 次的文件";
+        String crossCriteria = "单次提交涉及模块数超过 " + anomaly.getCrossDomainThreshold() + " 个";
+        String vagueCriteria = llmEnabled
+                ? "由 AI 语义分析判断，标准：提交信息须说明涉及的功能模块或修复的问题"
+                : "评分低于 50 分（满分 100），基于特征匹配：泛指词、描述过短、缺少具体内容";
+
+        return new AnomalyGroupDto(giantCommits, volatileFiles, crossDomainCommits, vagueCommitDtos,
+                giantCriteria, volatileCriteria, crossCriteria, vagueCriteria);
     }
 
     private GiantCommitDto toGiantCommitDto(CommitInfo c, CommitAnalysisDto analysis) {
@@ -598,7 +613,7 @@ public class AnalysisPipeline {
         // 统计数据
         List<AuthorStatsDto> authorStats = buildAuthorStats(commits);
         List<ModuleStatsDto> moduleStats = buildModuleStats(commits);
-        AnomalyGroupDto anomalyGroup = buildAnomalyGroup(anomalyResult, vagueCommits, vagueReasons, analysisMap);
+        AnomalyGroupDto anomalyGroup = buildAnomalyGroup(anomalyResult, vagueCommits, vagueReasons, analysisMap, llmEnabled);
         ActivityHeatmapDto heatmap = buildActivityHeatmap(commits);
 
         // 元信息
@@ -615,6 +630,49 @@ public class AnalysisPipeline {
     }
 
     // ==================== LLM 分析 ====================
+
+    /** Map 分析判定为高质量的标记，用于自校验过滤 */
+    private static final Set<String> HIGH_QUALITY_MARKS = Set.of("EXCELLENT", "HIGH");
+
+    /**
+     * 自校验过滤：移除 LLM Map 分析中质量评分为 GOOD/EXCELLENT 的误判模糊提交。
+     * <p>
+     * VagueScanner 批量扫描时可能将清晰提交误判为模糊，Map 阶段逐条分析更精确。
+     * 如果 Map 分析认为提交信息质量高，说明 VagueScanner 误判，应从模糊列表移除。
+     *
+     * @param vagueCommits 模糊提交列表
+     * @param vagueReasons 模糊原因 map（会同步移除误判项）
+     * @param analysisMap  LLM Map 分析结果
+     * @return 过滤后的模糊提交列表
+     */
+    List<CommitInfo> filterFalsePositiveVague(List<CommitInfo> vagueCommits,
+                                               Map<String, String> vagueReasons,
+                                               Map<String, CommitAnalysisDto> analysisMap) {
+        if (analysisMap.isEmpty() || vagueCommits.isEmpty()) {
+            return vagueCommits;
+        }
+
+        List<CommitInfo> filtered = new ArrayList<>();
+        int removedCount = 0;
+        for (CommitInfo c : vagueCommits) {
+            CommitAnalysisDto analysis = analysisMap.get(c.getHash());
+            if (analysis != null && analysis.getMessageQuality() != null
+                    && HIGH_QUALITY_MARKS.contains(analysis.getMessageQuality().toUpperCase())) {
+                // Map 分析认为质量高，移除误判
+                vagueReasons.remove(c.getShortHash());
+                removedCount++;
+                log.debug("自校验移除误判模糊提交: {} (质量={})", c.getShortHash(), analysis.getMessageQuality());
+            } else {
+                filtered.add(c);
+            }
+        }
+
+        if (removedCount > 0) {
+            log.info("LLM 自校验: 移除 {} 条误判模糊提交（{}/{} 保留）",
+                    removedCount, filtered.size(), vagueCommits.size());
+        }
+        return filtered;
+    }
 
     /**
      * LLM Map 阶段：对异常提交逐个语义分析。
@@ -654,9 +712,15 @@ public class AnalysisPipeline {
 
         log.info("LLM Map 阶段: 分析 {} 条异常提交", anomalousCommits.size());
         Map<String, CommitAnalysisDto> resultMap = new LinkedHashMap<>();
+        int total = anomalousCommits.size();
+        int idx = 0;
 
         for (Map.Entry<String, CommitInfo> entry : anomalousCommits.entrySet()) {
             CommitInfo c = entry.getValue();
+            idx++;
+            sseProgressService.sendProgress("LLM_MAP",
+                    "深度分析 " + idx + "/" + total + "（" + c.getShortHash() + "）...",
+                    65 + (idx * 15 / Math.max(total, 1)));
             try {
                 String diffSummary = buildDiffSummary(c);
                 CommitAnalysisDto analysis = llmMapTranslator.analyzeCommit(
