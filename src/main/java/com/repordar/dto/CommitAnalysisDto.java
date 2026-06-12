@@ -10,6 +10,8 @@ import java.util.List;
 
 /**
  * LLM Map 阶段分析结果，需从 LLM JSON 反序列化。
+ *
+ * @author frank
  */
 @Data
 @NoArgsConstructor

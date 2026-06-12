@@ -6,6 +6,11 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
+/**
+ * 易挥发文件 DTO。
+ *
+ * @author frank
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

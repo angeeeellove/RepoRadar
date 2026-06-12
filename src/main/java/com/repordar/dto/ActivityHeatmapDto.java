@@ -6,6 +6,11 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
+/**
+ * 活跃热力图数据 DTO。
+ *
+ * @author frank
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

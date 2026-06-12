@@ -6,6 +6,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
  * 应用配置属性，通过 setter 绑定 application.yml。
+ *
+ * @author frank
  */
 @Getter
 @Setter

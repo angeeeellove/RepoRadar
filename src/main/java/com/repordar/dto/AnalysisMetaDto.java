@@ -4,6 +4,11 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * 分析元信息 DTO。
+ *
+ * @author frank
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

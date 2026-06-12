@@ -6,6 +6,11 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
+/**
+ * 巨型提交 DTO。
+ *
+ * @author frank
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

@@ -6,6 +6,8 @@ import org.springframework.stereotype.Component;
 /**
  * 分析管线编排器，串联完整分析流程。
  * 各阶段将在后续任务中逐步实现。
+ *
+ * @author frank
  */
 @Slf4j
 @Component

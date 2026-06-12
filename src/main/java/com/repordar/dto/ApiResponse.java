@@ -4,6 +4,11 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * 通用 API 响应封装。
+ *
+ * @author frank
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

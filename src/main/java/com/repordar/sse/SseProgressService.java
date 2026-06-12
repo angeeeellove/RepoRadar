@@ -13,6 +13,8 @@ import java.io.IOException;
 
 /**
  * SSE 进度推送服务，通过 SseEmitter 向浏览器推送管线进度。
+ *
+ * @author frank
  */
 @Slf4j
 @Service
