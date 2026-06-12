@@ -82,9 +82,6 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
                     <encoding>UTF-8</encoding>
-                    <excludes>
-                        <exclude>**/llm/**/*.java</exclude>
-                    </excludes>
                 </configuration>
                 <dependencies>
                     <dependency>

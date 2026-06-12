@@ -1,7 +1,9 @@
 package com.repordar.anomaly;
 
+import com.repordar.git.CommitInfo;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -36,10 +38,42 @@ public class VagueScoringEngine {
             "[A-Z][a-z]*Exception|OOM|NPE|ERR[-_]?\\d+", Pattern.CASE_INSENSITIVE
     );
 
-    private final List<String> repoModuleNames;
+    private List<String> repoModuleNames;
 
+    /**
+     * 默认构造器（Spring 注入使用）。
+     */
+    public VagueScoringEngine() {
+        this.repoModuleNames = List.of();
+    }
+
+    /**
+     * 带模块名列表的构造器（测试使用）。
+     *
+     * @param repoModuleNames 仓库模块名列表
+     */
     public VagueScoringEngine(List<String> repoModuleNames) {
-        this.repoModuleNames = repoModuleNames;
+        this.repoModuleNames = repoModuleNames != null ? repoModuleNames : List.of();
+    }
+
+    /**
+     * 对提交列表进行评分过滤，返回模糊提交（评分低于阈值）。
+     *
+     * @param commits     提交列表
+     * @param moduleNames 模块名集合（优先于构造器中的列表）
+     * @return 模糊提交列表
+     */
+    public List<CommitInfo> scoreAndFilter(List<CommitInfo> commits, Set<String> moduleNames) {
+        List<String> effectiveModules = moduleNames != null
+                ? moduleNames.stream().toList() : repoModuleNames;
+        List<CommitInfo> result = new ArrayList<>();
+        for (CommitInfo commit : commits) {
+            int s = score(commit.getMessage(), effectiveModules);
+            if (s < VAGUE_THRESHOLD) {
+                result.add(commit);
+            }
+        }
+        return result;
     }
 
     /**
@@ -49,6 +83,17 @@ public class VagueScoringEngine {
      * @return 评分（0-100），低于 50 为模糊
      */
     public int score(String message) {
+        return score(message, repoModuleNames);
+    }
+
+    /**
+     * 对提交信息进行模糊度评分（带动态模块名）。
+     *
+     * @param message     提交信息
+     * @param moduleNames 动态传入的模块名列表
+     * @return 评分（0-100），低于 50 为模糊
+     */
+    public int score(String message, List<String> moduleNames) {
         if (message == null || message.isBlank()) {
             return 0;
         }
