@@ -80,9 +80,6 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <configuration>
-                    <encoding>UTF-8</encoding>
-                </configuration>
                 <dependencies>
                     <dependency>
                         <groupId>org.codehaus.plexus</groupId>
@@ -111,7 +108,6 @@
                 </dependencies>
                 <configuration>
                     <targetJdk>17</targetJdk>
-                    <sourceEncoding>UTF-8</sourceEncoding>
                     <typeResolution>false</typeResolution>
                     <failurePriority>4</failurePriority>
                     <failOnViolation>true</failOnViolation>
@@ -161,8 +157,9 @@
                 </dependencies>
                 <configuration>
                     <effort>Max</effort>
-                    <threshold>High</threshold>
+                    <threshold>Medium</threshold>
                     <failOnError>true</failOnError>
+                    <includeFilterFile>${project.basedir}/spotbugs-include.xml</includeFilterFile>
                     <excludeFilterFile>${project.basedir}/spotbugs-exclude.xml</excludeFilterFile>
                     <plugins>
                         <plugin>
@@ -171,9 +168,7 @@
                             <version>${findsecbugs-plugin.version}</version>
                         </plugin>
                     </plugins>
-                    <excludes>
-                        <exclude>**/target/**</exclude>
-                    </excludes>
+
                 </configuration>
                 <executions>
                     <execution>
