@@ -155,15 +155,20 @@ public class AnalysisPipeline {
 
             // 阶段 5: 模糊提交检测
             sseProgressService.sendProgress("vague", "正在检测模糊提交...", 60);
-            List<CommitInfo> vagueCommits = vagueCommitDetector.detect(commits, llmEnabled, allModules);
+            List<CommitInfo> vagueCommits = vagueCommitDetector.detect(commits, llmEnabled, allModules, llmKey, llmUrl, llmModel);
 
             // 阶段 6: LLM 语义分析（如果启用）
             GlobalInsightDto globalInsight;
+            Map<String, CommitAnalysisDto> analysisMap;
             if (llmEnabled) {
                 sseProgressService.sendProgress("llm", "正在进行 LLM 语义分析...", 70);
-                globalInsight = runLlmAnalysis(commits, llmKey, llmUrl, llmModel);
+                // Map 阶段：逐提交语义分析
+                analysisMap = runLlmMapPhase(anomalyResult, vagueCommits, llmKey, llmUrl, llmModel);
+                // Reduce 阶段：生成全局洞察
+                globalInsight = runLlmReduce(commits, analysisMap, llmKey, llmUrl, llmModel);
             } else {
                 globalInsight = createDefaultInsight();
+                analysisMap = Map.of();
             }
 
             // 阶段 7: 构建统计数据并组装报告
@@ -173,7 +178,7 @@ public class AnalysisPipeline {
             String repoName = extractRepoName(repoRef);
             ReportDataDto reportData = assembleReportData(
                     repoName, repoRef, ref, since, until, commits,
-                    anomalyResult, vagueCommits, globalInsight,
+                    anomalyResult, vagueCommits, analysisMap, globalInsight,
                     llmEnabled, llmModel, durationMs
             );
 
@@ -476,13 +481,17 @@ public class AnalysisPipeline {
      *
      * @param anomalyResult 异常检测结果
      * @param vagueCommits  模糊提交列表
+     * @param analysisMap   LLM 分析结果（key=commit hash），可为空 map
      * @return 异常分组 DTO
      */
     AnomalyGroupDto buildAnomalyGroup(AnomalyFilter.AnomalyResult anomalyResult,
-                                       List<CommitInfo> vagueCommits) {
+                                       List<CommitInfo> vagueCommits,
+                                       Map<String, CommitAnalysisDto> analysisMap) {
+        Map<String, CommitAnalysisDto> safeMap = analysisMap != null ? analysisMap : Map.of();
+
         // 巨型提交
         List<GiantCommitDto> giantCommits = anomalyResult.getGiantCommits().stream()
-                .map(this::toGiantCommitDto)
+                .map(c -> toGiantCommitDto(c, safeMap.get(c.getHash())))
                 .collect(Collectors.toList());
 
         // 易挥发文件
@@ -492,22 +501,22 @@ public class AnalysisPipeline {
 
         // 跨域提交
         List<CrossDomainCommitDto> crossDomainCommits = anomalyResult.getCrossDomainCommits().stream()
-                .map(this::toCrossDomainCommitDto)
+                .map(c -> toCrossDomainCommitDto(c, safeMap.get(c.getHash())))
                 .collect(Collectors.toList());
 
         // 模糊提交
         List<VagueCommitDto> vagueCommitDtos = vagueCommits.stream()
-                .map(this::toVagueCommitDto)
+                .map(c -> toVagueCommitDto(c, safeMap.get(c.getHash())))
                 .collect(Collectors.toList());
 
         return new AnomalyGroupDto(giantCommits, volatileFiles, crossDomainCommits, vagueCommitDtos);
     }
 
-    private GiantCommitDto toGiantCommitDto(CommitInfo c) {
+    private GiantCommitDto toGiantCommitDto(CommitInfo c, CommitAnalysisDto analysis) {
         return new GiantCommitDto(
                 c.getHash(), c.getShortHash(), c.getAuthor(), c.getAuthorEmail(),
                 c.getDate(), c.getMessage(), c.getTotalLines(), c.getFilesChanged(),
-                new ArrayList<>(c.getModules()), null
+                new ArrayList<>(c.getModules()), analysis
         );
     }
 
@@ -518,21 +527,21 @@ public class AnalysisPipeline {
         );
     }
 
-    private CrossDomainCommitDto toCrossDomainCommitDto(CommitInfo c) {
+    private CrossDomainCommitDto toCrossDomainCommitDto(CommitInfo c, CommitAnalysisDto analysis) {
         return new CrossDomainCommitDto(
                 c.getHash(), c.getShortHash(), c.getAuthor(), c.getAuthorEmail(),
                 c.getDate(), c.getMessage(), new ArrayList<>(c.getModules()),
-                c.getFilesChanged(), null
+                c.getFilesChanged(), analysis
         );
     }
 
-    private VagueCommitDto toVagueCommitDto(CommitInfo c) {
+    private VagueCommitDto toVagueCommitDto(CommitInfo c, CommitAnalysisDto analysis) {
         com.repordar.anomaly.VagueScoringEngine engine = new com.repordar.anomaly.VagueScoringEngine();
         int score = engine.score(c.getMessage());
         String reason = engine.generateReason(c.getMessage(), score);
         return new VagueCommitDto(
                 c.getHash(), c.getShortHash(), c.getAuthor(), c.getAuthorEmail(),
-                c.getDate(), c.getMessage(), reason, score, null
+                c.getDate(), c.getMessage(), reason, score, analysis
         );
     }
 
@@ -546,6 +555,7 @@ public class AnalysisPipeline {
                                       List<CommitInfo> commits,
                                       AnomalyFilter.AnomalyResult anomalyResult,
                                       List<CommitInfo> vagueCommits,
+                                      Map<String, CommitAnalysisDto> analysisMap,
                                       GlobalInsightDto globalInsight,
                                       boolean llmEnabled, String llmModel,
                                       long durationMs) {
@@ -565,7 +575,7 @@ public class AnalysisPipeline {
         // 统计数据
         List<AuthorStatsDto> authorStats = buildAuthorStats(commits);
         List<ModuleStatsDto> moduleStats = buildModuleStats(commits);
-        AnomalyGroupDto anomalyGroup = buildAnomalyGroup(anomalyResult, vagueCommits);
+        AnomalyGroupDto anomalyGroup = buildAnomalyGroup(anomalyResult, vagueCommits, analysisMap);
         ActivityHeatmapDto heatmap = buildActivityHeatmap(commits);
 
         // 元信息
@@ -584,18 +594,94 @@ public class AnalysisPipeline {
     // ==================== LLM 分析 ====================
 
     /**
-     * 运行 LLM Map/Reduce 分析。
-     * LLM 调用失败时优雅降级。
+     * LLM Map 阶段：对异常提交逐个语义分析。
+     * <p>
+     * 收集所有异常提交（巨型 + 跨域 + 模糊），逐个调用 LLM 分析意图、标签、风险、消息质量。
+     * LLM 调用失败时返回空 map（优雅降级）。
+     *
+     * @param anomalyResult 异常检测结果
+     * @param vagueCommits  模糊提交列表
+     * @param llmKey        LLM API Key
+     * @param llmUrl        LLM API URL
+     * @param llmModel      LLM 模型名
+     * @return commit hash → CommitAnalysisDto 映射
      */
-    private GlobalInsightDto runLlmAnalysis(List<CommitInfo> commits,
-                                             String llmKey, String llmUrl, String llmModel) {
+    Map<String, CommitAnalysisDto> runLlmMapPhase(AnomalyFilter.AnomalyResult anomalyResult,
+                                                   List<CommitInfo> vagueCommits,
+                                                   String llmKey, String llmUrl, String llmModel) {
+        Map<String, CommitInfo> anomalousCommits = new LinkedHashMap<>();
+
+        // 收集巨型提交
+        for (CommitInfo c : anomalyResult.getGiantCommits()) {
+            anomalousCommits.putIfAbsent(c.getHash(), c);
+        }
+        // 收集跨域提交
+        for (CommitInfo c : anomalyResult.getCrossDomainCommits()) {
+            anomalousCommits.putIfAbsent(c.getHash(), c);
+        }
+        // 收集模糊提交
+        for (CommitInfo c : vagueCommits) {
+            anomalousCommits.putIfAbsent(c.getHash(), c);
+        }
+
+        if (anomalousCommits.isEmpty()) {
+            log.info("无异常提交，跳过 LLM Map 阶段");
+            return Map.of();
+        }
+
+        log.info("LLM Map 阶段: 分析 {} 条异常提交", anomalousCommits.size());
+        Map<String, CommitAnalysisDto> resultMap = new LinkedHashMap<>();
+
+        for (Map.Entry<String, CommitInfo> entry : anomalousCommits.entrySet()) {
+            CommitInfo c = entry.getValue();
+            try {
+                String diffSummary = buildDiffSummary(c);
+                CommitAnalysisDto analysis = llmMapTranslator.analyzeCommit(
+                        c.getAuthor(), c.getDate(), c.getMessage(),
+                        diffSummary, llmUrl, llmKey, llmModel);
+                resultMap.put(entry.getKey(), analysis);
+            } catch (Exception e) {
+                log.warn("LLM Map 分析提交 {} 失败，跳过: {}", c.getShortHash(), e.getMessage());
+            }
+        }
+
+        log.info("LLM Map 阶段完成: {}/{} 条成功", resultMap.size(), anomalousCommits.size());
+        return resultMap;
+    }
+
+    /**
+     * 构建变更文件摘要（替代 diff 文本）。
+     * CommitInfo 不存储 diff，用文件列表 + 行数统计作为 LLM 输入。
+     */
+    private String buildDiffSummary(CommitInfo c) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("变更文件: ");
+        if (c.getChangedFiles() != null && !c.getChangedFiles().isEmpty()) {
+            sb.append(String.join(", ", c.getChangedFiles()));
+        } else {
+            sb.append("(无记录)");
+        }
+        sb.append("\n变更统计: +").append(c.getLinesAdded())
+          .append(" -").append(c.getLinesDeleted())
+          .append(" 行, ").append(c.getFilesChanged()).append(" 文件");
+        if (c.getModules() != null && !c.getModules().isEmpty()) {
+            sb.append("\n涉及模块: ").append(c.getModules());
+        }
+        return sb.toString();
+    }
+
+    /**
+     * LLM Reduce 阶段：基于统计数据和 Map 结果生成全局洞察。
+     */
+    private GlobalInsightDto runLlmReduce(List<CommitInfo> commits,
+                                           Map<String, CommitAnalysisDto> analysisMap,
+                                           String llmKey, String llmUrl, String llmModel) {
         try {
-            // Reduce 阶段：生成全局洞察
             List<AuthorStatsDto> authorStats = buildAuthorStats(commits);
             List<ModuleStatsDto> moduleStats = buildModuleStats(commits);
-            return llmReduceAnalyzer.generateInsight(authorStats, moduleStats, llmUrl, llmKey, llmModel);
+            return llmReduceAnalyzer.generateInsight(authorStats, moduleStats, analysisMap, llmUrl, llmKey, llmModel);
         } catch (Exception e) {
-            log.warn("LLM 分析失败，降级为默认洞察: {}", e.getMessage());
+            log.warn("LLM Reduce 分析失败，降级为默认洞察: {}", e.getMessage());
             return createDefaultInsight();
         }
     }

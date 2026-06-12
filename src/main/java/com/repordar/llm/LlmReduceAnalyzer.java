@@ -3,12 +3,14 @@ package com.repordar.llm;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.repordar.dto.AuthorStatsDto;
+import com.repordar.dto.CommitAnalysisDto;
 import com.repordar.dto.GlobalInsightDto;
 import com.repordar.dto.ModuleStatsDto;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * LLM Reduce 阶段分析器，生成全局洞察。
@@ -26,6 +28,7 @@ public class LlmReduceAnalyzer {
             "你是一个代码库分析专家。根据以下统计数据，生成代码库健康报告。\n\n" +
             "作者统计：\n%s\n\n" +
             "模块统计：\n%s\n\n" +
+            "%s" +
             "返回 JSON 对象，包含以下字段：\n" +
             "- summary: 整体总结（简短中文描述，50字以内）\n" +
             "- recommendations: 改进建议列表（中文字符串数组）\n" +
@@ -43,15 +46,17 @@ public class LlmReduceAnalyzer {
     /**
      * 生成全局洞察。
      *
-     * @param authorStats 作者统计列表
-     * @param moduleStats 模块统计列表
-     * @param baseUrl     LLM API 基础 URL
-     * @param apiKey      LLM API 密钥
+     * @param authorStats  作者统计列表
+     * @param moduleStats  模块统计列表
+     * @param analysisMap  LLM Map 分析结果（key=commit hash），可为空
+     * @param baseUrl      LLM API 基础 URL
+     * @param apiKey       LLM API 密钥
      * @param modelName    LLM 模型名称
      * @return 全局洞察
      */
     public GlobalInsightDto generateInsight(List<AuthorStatsDto> authorStats,
                                              List<ModuleStatsDto> moduleStats,
+                                             Map<String, CommitAnalysisDto> analysisMap,
                                              String baseUrl,
                                              String apiKey,
                                              String modelName) {
@@ -63,7 +68,8 @@ public class LlmReduceAnalyzer {
         try {
             String authorStatsText = formatAuthorStats(authorStats);
             String moduleStatsText = formatModuleStats(moduleStats);
-            String prompt = String.format(INSIGHT_PROMPT, authorStatsText, moduleStatsText);
+            String analysisSummary = formatAnalysisSummary(analysisMap);
+            String prompt = String.format(INSIGHT_PROMPT, authorStatsText, moduleStatsText, analysisSummary);
 
             var messages = List.of(
                     LlmClient.Message.ofUser(prompt)
@@ -107,6 +113,29 @@ public class LlmReduceAnalyzer {
             sb.append(String.format("- %s: %d 次提交, %d 行变更\n",
                     stats.getName(), stats.getCommitCount(), stats.getLinesChanged()));
         }
+        return sb.toString();
+    }
+
+    /**
+     * 格式化 Map 阶段分析摘要，注入 Reduce prompt。
+     */
+    private String formatAnalysisSummary(Map<String, CommitAnalysisDto> analysisMap) {
+        if (analysisMap == null || analysisMap.isEmpty()) {
+            return "";
+        }
+
+        StringBuilder sb = new StringBuilder("异常提交分析摘要：\n");
+        for (Map.Entry<String, CommitAnalysisDto> entry : analysisMap.entrySet()) {
+            String shortHash = entry.getKey().length() > 7
+                    ? entry.getKey().substring(0, 7) : entry.getKey();
+            CommitAnalysisDto a = entry.getValue();
+            sb.append(String.format("- %s: intent=%s, risk=%s, quality=%s\n",
+                    shortHash,
+                    a.getIntent() != null ? a.getIntent() : "未知",
+                    a.getRiskLevel() != null ? a.getRiskLevel() : "未知",
+                    a.getMessageQuality() != null ? a.getMessageQuality() : "未知"));
+        }
+        sb.append("\n");
         return sb.toString();
     }
 
