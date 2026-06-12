@@ -61,6 +61,7 @@
     .analysis-box { margin-top: 8px; font-size: 12px; color: #6b7280; background: #f9fafb; padding: 6px 10px; border-radius: 6px; }
 
     .empty-state { text-align: center; padding: 32px 16px; color: #9ca3af; font-size: 14px; }
+    .criteria-box { display: flex; align-items: center; gap: 6px; padding: 8px 12px; margin-bottom: 14px; background: #f0f4ff; border-radius: 6px; font-size: 12px; color: #6366f1; border: 1px solid #e0e7ff; }
     .insight-text { color: #374151; line-height: 1.6; margin-bottom: 16px; }
     .rec-list { list-style: none; }
     .rec-list li { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; color: #4b5563; margin-bottom: 8px; }
@@ -224,6 +225,7 @@
 
       <!-- Giant Commits -->
       <div v-if="anomalyTab === 'giant'">
+        <div class="criteria-box">📋 检测标准：{{ anomalies.giantCriteria }}</div>
         <div v-if="!anomalies.giantCommits.length" class="empty-state">✅ 未检测到巨型提交</div>
         <div v-for="c in anomalies.giantCommits" :key="c.hash" class="commit-row">
           <div class="commit-meta">
@@ -245,6 +247,7 @@
 
       <!-- Volatile Files -->
       <div v-if="anomalyTab === 'volatile'">
+        <div class="criteria-box">📋 检测标准：{{ anomalies.volatileCriteria }}</div>
         <div v-if="!anomalies.volatileFiles.length" class="empty-state">✅ 未检测到易挥发文件</div>
         <table v-else>
           <thead><tr><th>文件路径</th><th>变更次数</th><th>窗口(天)</th><th>变更行</th><th>贡献者</th></tr></thead>
@@ -264,6 +267,7 @@
 
       <!-- Cross Domain Commits -->
       <div v-if="anomalyTab === 'cross'">
+        <div class="criteria-box">📋 检测标准：{{ anomalies.crossDomainCriteria }}</div>
         <div v-if="!anomalies.crossDomainCommits.length" class="empty-state">✅ 未检测到跨域提交</div>
         <div v-for="c in anomalies.crossDomainCommits" :key="c.hash" class="commit-row">
           <div class="commit-meta">
@@ -285,6 +289,7 @@
 
       <!-- Vague Commits -->
       <div v-if="anomalyTab === 'vague'">
+        <div class="criteria-box">📋 检测标准：{{ anomalies.vagueCriteria }}</div>
         <div v-if="!anomalies.vagueCommits.length" class="empty-state">✅ 未检测到模糊提交</div>
         <div v-for="c in anomalies.vagueCommits" :key="c.hash" class="commit-row">
           <div class="commit-meta">
@@ -389,7 +394,7 @@ createApp({
         tooltip: {
           formatter: function(p) {
             if (!p.data) return '';
-            return days[p.data[0]] + ' ' + hours[p.data[1]] + '<br/>提交: ' + p.data[2] + ' 次';
+            return days[p.data[1]] + ' ' + hours[p.data[0]] + '<br/>提交: ' + p.data[2] + ' 次';
           }
         },
         grid: { left: 60, right: 20, top: 10, bottom: 40 },
@@ -402,7 +407,7 @@ createApp({
         },
         series: [{
           type: 'heatmap',
-          data: heatmap.data.map(function(p) { return [p.day, p.hour, p.count]; }),
+          data: heatmap.data.map(function(p) { return [p.hour, p.day, p.count]; }),
           label: { show: false },
           emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.3)' } }
         }]
