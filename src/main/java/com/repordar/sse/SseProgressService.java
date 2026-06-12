@@ -29,6 +29,15 @@ public class SseProgressService {
         return this.emitter;
     }
 
+    /**
+     * 获取当前活跃的 SseEmitter（供 Controller 使用）。
+     *
+     * @return 当前 emitter，未创建时返回 null
+     */
+    public SseEmitter getEmitter() {
+        return this.emitter;
+    }
+
     public void sendProgress(String stage, String message, int percent) {
         send("progress", ApiResponse.ok(new ProgressData(stage, message, percent)));
     }
