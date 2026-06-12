@@ -6,7 +6,7 @@
 
 **Architecture:** Spring Boot CLI 应用（Picocli），同步管线架构。JGit 做 Git 操作，Java 规则引擎做异常检测，LLM（OpenAI 兼容 API）做语义分析，Vue3 + ECharts（CDN）做报告渲染。单 JAR 部署，优雅降级。
 
-**Tech Stack:** Java 17, Spring Boot 3.2+, Gradle, Picocli, JGit, Jackson, RestClient, Vue3/ECharts/TailwindCSS (CDN)
+**Tech Stack:** Java 17, Spring Boot 3.2+, Maven, Picocli, JGit, Jackson, RestClient, Vue3/ECharts/TailwindCSS (CDN)
 
 **Design Docs:**
 - 需求澄清: `docs/superpowers/specs/2026-06-12-reporadar-prd-refinement-design.md`
@@ -19,8 +19,7 @@
 
 ```
 repordar/
-├── build.gradle
-├── settings.gradle
+├── pom.xml
 ├── src/main/java/com/repordar/
 │   ├── RepoRadarApplication.java                 # Spring Boot 入口 + Picocli 命令
 │   ├── config/
@@ -85,73 +84,85 @@ repordar/
 
 ## Phase 1: Scaffolding
 
-### Task 1: Gradle 项目初始化
+### Task 1: Maven 项目初始化
 
 **Files:**
-- Create: `build.gradle`
-- Create: `settings.gradle`
+- Create: `pom.xml`
 - Create: `src/main/java/com/repordar/RepoRadarApplication.java`
 
-- [ ] **Step 1: 创建 settings.gradle**
+- [ ] **Step 1: 创建 pom.xml**
 
-```groovy
-// settings.gradle
-rootProject.name = 'repordar'
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.2.5</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.repordar</groupId>
+    <artifactId>repordar</artifactId>
+    <version>1.0.0</version>
+    <packaging>jar</packaging>
+    <name>RepoRadar</name>
+    <description>团队代码脉搏雷达 - AI Git 分析工具</description>
+
+    <properties>
+        <java.version>17</java.version>
+        <picocli.version>4.7.5</picocli.version>
+        <jgit.version>6.8.0.202311291450-r</jgit.version>
+    </properties>
+
+    <dependencies>
+        <!-- Spring Boot Web (内嵌 HTTP Server + SSE) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- CLI 框架 -->
+        <dependency>
+            <groupId>info.picocli</groupId>
+            <artifactId>picocli-spring-boot-starter</artifactId>
+            <version>${picocli.version}</version>
+        </dependency>
+
+        <!-- Git 操作 -->
+        <dependency>
+            <groupId>org.eclipse.jgit</groupId>
+            <artifactId>org.eclipse.jgit</artifactId>
+            <version>${jgit.version}</version>
+        </dependency>
+
+        <!-- Jackson (Spring Boot 已包含) -->
+
+        <!-- 测试 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>repordar</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
 ```
 
-- [ ] **Step 2: 创建 build.gradle**
-
-```groovy
-// build.gradle
-plugins {
-    id 'java'
-    id 'org.springframework.boot' version '3.2.5'
-    id 'io.spring.dependency-management' version '1.1.4'
-}
-
-group = 'com.repordar'
-version = '1.0.0'
-
-java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
-}
-
-repositories {
-    mavenCentral()
-}
-
-dependencies {
-    // Spring Boot
-    implementation 'org.springframework.boot:spring-boot-starter-web'
-
-    // CLI
-    implementation 'info.picocli:picocli-spring-boot-starter:4.7.5'
-
-    // Git
-    implementation 'org.eclipse.jgit:org.eclipse.jgit:6.8.0.202311291450-r'
-
-    // LLM HTTP Client (Spring RestClient)
-    implementation 'org.springframework.boot:spring-boot-starter-web'
-
-    // Jackson (comes with spring-boot-starter-web)
-
-    // Test
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    testImplementation 'org.junit.jupiter:junit-jupiter'
-}
-
-test {
-    useJUnitPlatform()
-}
-
-bootJar {
-    archiveBaseName = 'repordar'
-    archiveVersion = '1.0.0'
-}
-```
-
-- [ ] **Step 3: 创建 Spring Boot 入口**
+- [ ] **Step 2: 创建 Spring Boot 入口**
 
 ```java
 // src/main/java/com/repordar/RepoRadarApplication.java
@@ -168,7 +179,7 @@ public class RepoRadarApplication {
 }
 ```
 
-- [ ] **Step 4: 创建默认配置文件**
+- [ ] **Step 3: 创建默认配置文件**
 
 ```yaml
 # src/main/resources/application.yml
@@ -193,16 +204,16 @@ spring:
     banner-mode: off
 ```
 
-- [ ] **Step 5: 验证构建**
+- [ ] **Step 4: 验证构建**
 
-Run: `./gradlew bootJar`
-Expected: BUILD SUCCESSFUL
+Run: `./mvnw clean package -DskipTests`
+Expected: BUILD SUCCESS
 
-- [ ] **Step 6: 提交**
+- [ ] **Step 5: 提交**
 
 ```bash
 git add -A
-git commit -m "🔧 chore: 初始化 Gradle 项目结构与 Spring Boot 入口"
+git commit -m "🔧 chore: 初始化 Maven 项目结构与 Spring Boot 入口"
 ```
 
 ---
@@ -409,8 +420,8 @@ public record ReportDataDto(
 
 - [ ] **Step 10: 验证编译**
 
-Run: `./gradlew compileJava`
-Expected: BUILD SUCCESSFUL
+Run: `./mvnw compile`
+Expected: BUILD SUCCESS
 
 - [ ] **Step 11: 提交**
 
@@ -464,7 +475,7 @@ public record AppProperties(
 
 - [ ] **Step 2: 验证编译**
 
-Run: `./gradlew compileJava`
+Run: `./mvnw compile`
 Expected: BUILD SUCCESSFUL
 
 - [ ] **Step 3: 提交**
@@ -631,7 +642,7 @@ public class AnalyzeCommand implements Callable<Integer> {
 
 - [ ] **Step 3: 验证编译**
 
-Run: `./gradlew compileJava`
+Run: `./mvnw compile`
 Expected: BUILD SUCCESSFUL
 
 - [ ] **Step 4: 提交**
@@ -774,7 +785,7 @@ class ModuleDetectorTest {
 
 - [ ] **Step 2: 运行测试确认失败**
 
-Run: `./gradlew test --tests ModuleDetectorTest`
+Run: `./mvnw test -Dtest=ModuleDetectorTest`
 Expected: FAIL (class not found)
 
 - [ ] **Step 3: 实现 ModuleDetector**
@@ -831,7 +842,7 @@ public class ModuleDetector {
 
 - [ ] **Step 4: 运行测试确认通过**
 
-Run: `./gradlew test --tests ModuleDetectorTest`
+Run: `./mvnw test -Dtest=ModuleDetectorTest`
 Expected: PASS
 
 - [ ] **Step 5: 编写 MetadataExtractor 测试**
@@ -1078,7 +1089,7 @@ public class MetadataExtractor {
 
 - [ ] **Step 7: 运行全部测试**
 
-Run: `./gradlew test`
+Run: `./mvnw test`
 Expected: PASS
 
 - [ ] **Step 8: 提交**
@@ -1148,7 +1159,7 @@ class GiantCommitRuleTest {
 
 - [ ] **Step 2: 运行测试确认失败**
 
-Run: `./gradlew test --tests GiantCommitRuleTest`
+Run: `./mvnw test -Dtest=GiantCommitRuleTest`
 Expected: FAIL
 
 - [ ] **Step 3: 实现 GiantCommitRule**
@@ -1180,7 +1191,7 @@ public class GiantCommitRule {
 
 - [ ] **Step 4: 运行测试确认通过**
 
-Run: `./gradlew test --tests GiantCommitRuleTest`
+Run: `./mvnw test -Dtest=GiantCommitRuleTest`
 Expected: PASS
 
 - [ ] **Step 5: 编写 VolatileFileRule 测试**
@@ -1300,7 +1311,7 @@ public class VolatileFileRule {
 
 - [ ] **Step 7: 运行测试确认通过**
 
-Run: `./gradlew test --tests VolatileFileRuleTest`
+Run: `./mvnw test -Dtest=VolatileFileRuleTest`
 Expected: PASS
 
 - [ ] **Step 8: 编写 CrossDomainRule 测试 + 实现**
@@ -1365,7 +1376,7 @@ public class CrossDomainRule {
 
 - [ ] **Step 9: 运行测试确认通过**
 
-Run: `./gradlew test --tests CrossDomainRuleTest`
+Run: `./mvnw test -Dtest=CrossDomainRuleTest`
 Expected: PASS
 
 - [ ] **Step 10: 实现 AnomalyFilter 编排器**
@@ -1414,7 +1425,7 @@ public class AnomalyFilter {
 
 - [ ] **Step 11: 运行全部测试**
 
-Run: `./gradlew test`
+Run: `./mvnw test`
 Expected: PASS
 
 - [ ] **Step 12: 提交**
@@ -1504,7 +1515,7 @@ class VagueScoringEngineTest {
 
 - [ ] **Step 2: 运行测试确认失败**
 
-Run: `./gradlew test --tests VagueScoringEngineTest`
+Run: `./mvnw test -Dtest=VagueScoringEngineTest`
 Expected: FAIL
 
 - [ ] **Step 3: 实现 VagueScoringEngine**
@@ -1620,7 +1631,7 @@ public class VagueScoringEngine {
 
 - [ ] **Step 4: 运行测试确认通过**
 
-Run: `./gradlew test --tests VagueScoringEngineTest`
+Run: `./mvnw test -Dtest=VagueScoringEngineTest`
 Expected: PASS
 
 - [ ] **Step 5: 实现 VagueCommitDetector（双模式编排）**
@@ -1685,7 +1696,7 @@ public class VagueCommitDetector {
 
 - [ ] **Step 6: 运行全部测试**
 
-Run: `./gradlew test`
+Run: `./mvnw test`
 Expected: PASS
 
 - [ ] **Step 7: 提交**
@@ -2007,7 +2018,7 @@ public class LlmMapTranslator {
 
 - [ ] **Step 4: 运行测试确认通过**
 
-Run: `./gradlew test --tests LlmMapTranslatorTest`
+Run: `./mvnw test -Dtest=LlmMapTranslatorTest`
 Expected: PASS
 
 - [ ] **Step 5: 实现 LlmReduceAnalyzer**
@@ -2096,7 +2107,7 @@ public class LlmReduceAnalyzer {
 
 - [ ] **Step 6: 运行全部测试**
 
-Run: `./gradlew test`
+Run: `./mvnw test`
 Expected: PASS
 
 - [ ] **Step 7: 提交**
@@ -2472,7 +2483,7 @@ class EndToEndTest {
 
 - [ ] **Step 2: 运行测试**
 
-Run: `./gradlew test`
+Run: `./mvnw test`
 Expected: PASS
 
 - [ ] **Step 3: 提交**
@@ -2501,7 +2512,7 @@ git commit -m "✅ test: 添加端到端集成测试（降级模式）"
 - 视图层通过 `__INJECT_DATA__` 模板注入，保证渲染稳定
 
 ## 技术栈
-- Java 17, Spring Boot 3.2, Gradle
+- Java 17, Spring Boot 3.2, Maven
 - JGit 6.8, Picocli 4.7, Jackson
 - Vue3 + ECharts 5 + TailwindCSS 3 (CDN, 无构建)
 
@@ -2511,8 +2522,8 @@ git commit -m "✅ test: 添加端到端集成测试（降级模式）"
 - 单 JAR 部署，零额外依赖
 
 ## 测试
-- 运行: `./gradlew test`
-- 构建: `./gradlew bootJar`
+- 运行: `./mvnw test`
+- 构建: `./mvnw package -DskipTests`
 ```
 
 - [ ] **Step 2: 提交**
@@ -2528,17 +2539,17 @@ git commit -m "📝 docs: 添加 CLAUDE.md 项目约束文件"
 
 - [ ] **Step 1: 完整构建**
 
-Run: `./gradlew clean bootJar`
-Expected: BUILD SUCCESSFUL
+Run: `./mvnw clean package -DskipTests`
+Expected: BUILD SUCCESS
 
 - [ ] **Step 2: 验证 JAR 可执行**
 
-Run: `java -jar build/libs/repordar-1.0.0.jar --help`
+Run: `java -jar target/repordar.jar --help`
 Expected: 显示 CLI 帮助信息
 
 - [ ] **Step 3: 运行全量测试**
 
-Run: `./gradlew test`
+Run: `./mvnw test`
 Expected: ALL TESTS PASS
 
 - [ ] **Step 4: 提交最终状态**
