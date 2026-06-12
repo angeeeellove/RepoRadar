@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!-- 安全相关规则 -->
+    <Match>
+        <Bug category="SECURITY"/>
+    </Match>
+    <!-- 坏实践 -->
+    <Match>
+        <Bug category="BAD_PRACTICE"/>
+    </Match>
+    <!-- 正确性 -->
+    <Match>
+        <Bug category="CORRECTNESS"/>
+    </Match>
+    <!-- 性能 -->
+    <Match>
+        <Bug category="PERFORMANCE"/>
+    </Match>
+    <!-- 多线程正确性 -->
+    <Match>
+        <Bug category="MT_CORRECTNESS"/>
+    </Match>
+    <!-- 危险代码（如暴露内部可变状态） -->
+    <Match>
+        <Bug category="STYLE"/>
+    </Match>
+</FindBugsFilter>
