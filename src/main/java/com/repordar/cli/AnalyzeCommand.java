@@ -64,12 +64,25 @@ public class AnalyzeCommand implements Callable<Integer> {
     @Override
     public Integer call() {
         String effectiveLlmKey = resolve(llmApiKey, props.getLlm().getApiKey());
-        String effectiveLlmUrl = resolve(llmBaseUrl, props.getLlm().getBaseUrl());
         String effectiveLlmModel = resolve(llmModel, props.getLlm().getModelName());
+
+        // Base URL: CLI 参数 > 自动推断（根据模型名匹配厂商）> 配置文件
+        String explicitUrl = resolve(llmBaseUrl, null);
+        String effectiveLlmUrl = AppProperties.Llm.resolveBaseUrl(effectiveLlmModel, explicitUrl);
+        if (effectiveLlmUrl == null) {
+            effectiveLlmUrl = props.getLlm().getBaseUrl();
+        }
 
         System.out.println("🔍 RepoRadar 开始分析: " + repo);
         if (effectiveLlmKey == null || effectiveLlmKey.isBlank()) {
             System.out.println("⚠️  未配置 LLM API Key，将跳过语义分析");
+        } else if (effectiveLlmUrl == null || effectiveLlmUrl.isBlank()) {
+            System.out.println("⚠️  无法识别 LLM 厂商，请通过 --llm-base-url 指定 API 地址");
+            System.out.println("   支持自动识别: deepseek / gpt / claude / glm / qwen / moonshot");
+            System.out.println("   将跳过语义分析");
+            effectiveLlmKey = null;
+        } else {
+            System.out.println("📡 LLM 配置: model=" + effectiveLlmModel + ", url=" + effectiveLlmUrl);
         }
 
         try {
