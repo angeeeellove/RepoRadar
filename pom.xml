@@ -110,7 +110,7 @@
                     </dependency>
                 </dependencies>
                 <configuration>
-                    <targetJdk>${java.version}</targetJdk>
+                    <targetJdk>17</targetJdk>
                     <sourceEncoding>UTF-8</sourceEncoding>
                     <failurePriority>4</failurePriority>
                     <failOnViolation>true</failOnViolation>
