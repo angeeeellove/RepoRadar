@@ -20,7 +20,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -44,6 +43,21 @@ public class AnalysisPipeline {
     private static final String DEFAULT_BRANCH = "HEAD";
     private static final DateTimeFormatter DATE_PARSER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
     private static final DateTimeFormatter META_TIMESTAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
+
+    /** 活跃时段阈值：早晨开始小时 */
+    private static final int HOUR_MORNING_START = 6;
+    /** 活跃时段阈值：早晨结束 / 下午开始小时 */
+    private static final int HOUR_AFTERNOON_START = 12;
+    /** 活跃时段阈值：下午结束 / 晚上开始小时 */
+    private static final int HOUR_EVENING_START = 18;
+    /** 活跃时段阈值：晚上结束小时 */
+    private static final int HOUR_NIGHT_START = 22;
+    /** Git URL 后缀 */
+    private static final String GIT_URL_SUFFIX = ".git";
+    /** 远程 URL 协议前缀 */
+    private static final String HTTP_PREFIX = "http://";
+    private static final String HTTPS_PREFIX = "https://";
+    private static final String GIT_SSH_PREFIX = "git@";
 
     private final GitCloner gitCloner;
     private final MetadataExtractor metadataExtractor;
@@ -299,10 +313,11 @@ public class AnalysisPipeline {
         for (CommitInfo c : commits) {
             try {
                 LocalDateTime dt = LocalDateTime.parse(c.getDate(), DATE_PARSER);
-                int dayOfWeek = dt.getDayOfWeek().getValue() - 1; // Monday=0
+                // Monday=0, Sunday=6
+                int dayOfWeek = dt.getDayOfWeek().getValue() - 1;
                 dist[dayOfWeek]++;
             } catch (Exception e) {
-                // 日期解析失败，跳过
+                log.debug("星期分布统计跳过日期解析失败: {}", c.getDate());
             }
         }
         return dist;
@@ -350,11 +365,11 @@ public class AnalysisPipeline {
                 maxIdx = i;
             }
         }
-        if (maxIdx >= 6 && maxIdx < 12) {
+        if (maxIdx >= HOUR_MORNING_START && maxIdx < HOUR_AFTERNOON_START) {
             return "早鸟型";
-        } else if (maxIdx >= 12 && maxIdx < 18) {
+        } else if (maxIdx >= HOUR_AFTERNOON_START && maxIdx < HOUR_EVENING_START) {
             return "稳定型";
-        } else if (maxIdx >= 18 && maxIdx < 22) {
+        } else if (maxIdx >= HOUR_EVENING_START && maxIdx < HOUR_NIGHT_START) {
             return "夜猫型";
         } else {
             return "夜猫型";
@@ -428,12 +443,13 @@ public class AnalysisPipeline {
         for (CommitInfo c : commits) {
             try {
                 LocalDateTime dt = LocalDateTime.parse(c.getDate(), DATE_PARSER);
-                int dayOfWeek = dt.getDayOfWeek().getValue() - 1; // Monday=0
+                // Monday=0, Sunday=6
+                int dayOfWeek = dt.getDayOfWeek().getValue() - 1;
                 int hour = dt.getHour();
                 String key = dayOfWeek + "-" + hour;
                 heatmapMap.merge(key, 1, Integer::sum);
             } catch (Exception e) {
-                // 日期解析失败，跳过
+                log.debug("热力图统计跳过日期解析失败: {}", c.getDate());
             }
         }
 
@@ -605,10 +621,10 @@ public class AnalysisPipeline {
             return "unknown";
         }
         // 处理 URL: https://github.com/org/repo.git → repo
-        if (repoRef.startsWith("http://") || repoRef.startsWith("https://") || repoRef.startsWith("git@")) {
+        if (repoRef.startsWith(HTTP_PREFIX) || repoRef.startsWith(HTTPS_PREFIX) || repoRef.startsWith(GIT_SSH_PREFIX)) {
             String name = repoRef;
-            if (name.endsWith(".git")) {
-                name = name.substring(0, name.length() - 4);
+            if (name.endsWith(GIT_URL_SUFFIX)) {
+                name = name.substring(0, name.length() - GIT_URL_SUFFIX.length());
             }
             int lastSlash = name.lastIndexOf('/');
             if (lastSlash >= 0 && lastSlash < name.length() - 1) {
