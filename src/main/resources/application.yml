@@ -17,3 +17,7 @@ spring:
   main:
     web-application-type: servlet
     banner-mode: off
+
+logging:
+  level:
+    org.apache.tomcat.util.net.Acceptor: ERROR
