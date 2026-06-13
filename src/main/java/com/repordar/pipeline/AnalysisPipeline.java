@@ -710,25 +710,29 @@ public class AnalysisPipeline {
             return Map.of();
         }
 
-        log.info("LLM Map 阶段: 分析 {} 条异常提交", anomalousCommits.size());
-        Map<String, CommitAnalysisDto> resultMap = new LinkedHashMap<>();
-        int total = anomalousCommits.size();
-        int idx = 0;
+        log.info("LLM Map 阶段: 批量分析 {} 条异常提交", anomalousCommits.size());
+        sseProgressService.sendProgress("LLM_MAP",
+                "深度分析 " + anomalousCommits.size() + " 条异常提交...",
+                65);
 
+        // 构建批量分析输入：短哈希 → [作者, 日期, 消息, diff摘要]
+        Map<String, String[]> commitDataMap = new LinkedHashMap<>();
         for (Map.Entry<String, CommitInfo> entry : anomalousCommits.entrySet()) {
             CommitInfo c = entry.getValue();
-            idx++;
-            sseProgressService.sendProgress("LLM_MAP",
-                    "深度分析 " + idx + "/" + total + "（" + c.getShortHash() + "）...",
-                    65 + (idx * 15 / Math.max(total, 1)));
-            try {
-                String diffSummary = buildDiffSummary(c);
-                CommitAnalysisDto analysis = llmMapTranslator.analyzeCommit(
-                        c.getAuthor(), c.getDate(), c.getMessage(),
-                        diffSummary, llmUrl, llmKey, llmModel);
-                resultMap.put(entry.getKey(), analysis);
-            } catch (Exception e) {
-                log.warn("LLM Map 分析提交 {} 失败，跳过: {}", c.getShortHash(), e.getMessage());
+            commitDataMap.put(c.getShortHash(), new String[]{
+                    c.getAuthor(), c.getDate(), c.getMessage(), buildDiffSummary(c)
+            });
+        }
+
+        Map<String, CommitAnalysisDto> batchResults =
+                llmMapTranslator.analyzeCommitsBatch(commitDataMap, llmUrl, llmKey, llmModel);
+
+        // 将 shortHash → CommitAnalysisDto 转为 hash → CommitAnalysisDto
+        Map<String, CommitAnalysisDto> resultMap = new LinkedHashMap<>();
+        for (Map.Entry<String, CommitInfo> entry : anomalousCommits.entrySet()) {
+            CommitAnalysisDto dto = batchResults.get(entry.getValue().getShortHash());
+            if (dto != null) {
+                resultMap.put(entry.getKey(), dto);
             }
         }
 

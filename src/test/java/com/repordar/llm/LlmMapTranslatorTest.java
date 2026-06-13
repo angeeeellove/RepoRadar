@@ -18,13 +18,11 @@ class LlmMapTranslatorTest {
 
     @BeforeEach
     void setUp() {
-        // Mock LlmClient 不依赖真实 API
         translator = new LlmMapTranslator(null, new ObjectMapper());
     }
 
     @Test
     void shouldParseNormalJsonSuccessfully() {
-        // 正常 JSON 响应
         String response = """
                 {
                     "intent": "修复用户登录超时问题",
@@ -35,12 +33,7 @@ class LlmMapTranslatorTest {
                 }
                 """;
 
-        // 使用反射调用私有方法 extractJson 和 parseAnalysisResult
         try {
-            var method = LlmMapTranslator.class.getDeclaredMethod("extractJson", String.class);
-            method.setAccessible(true);
-            String json = (String) method.invoke(translator, response);
-
             var parseMethod = LlmMapTranslator.class.getDeclaredMethod("parseAnalysisResult", String.class);
             parseMethod.setAccessible(true);
             CommitAnalysisDto dto = (CommitAnalysisDto) parseMethod.invoke(translator, response);
@@ -59,7 +52,6 @@ class LlmMapTranslatorTest {
 
     @Test
     void shouldTolerateExtraFields() {
-        // 带有多余字段的 JSON（@JsonIgnoreProperties(ignoreUnknown = true) 应该忽略）
         String response = """
                 {
                     "intent": "添加缓存功能",
@@ -88,7 +80,6 @@ class LlmMapTranslatorTest {
 
     @Test
     void shouldDegradeOnInvalidTags() {
-        // 非法标签应该被过滤掉
         String response = """
                 {
                     "intent": "更新配置",
@@ -117,7 +108,6 @@ class LlmMapTranslatorTest {
 
     @Test
     void shouldKeepValidTags() {
-        // 合法标签应该保留
         String response = """
                 {
                     "intent": "重构用户模块",
@@ -144,7 +134,6 @@ class LlmMapTranslatorTest {
 
     @Test
     void shouldHandleMarkdownWrappedJson() {
-        // Markdown 代码块包裹的 JSON
         String response = """
                 ```json
                 {
@@ -158,7 +147,7 @@ class LlmMapTranslatorTest {
                 """;
 
         try {
-            var method = LlmMapTranslator.class.getDeclaredMethod("extractJson", String.class);
+            var method = LlmMapTranslator.class.getDeclaredMethod("extractJsonObject", String.class);
             method.setAccessible(true);
             String json = (String) method.invoke(translator, response);
 
@@ -171,7 +160,6 @@ class LlmMapTranslatorTest {
 
     @Test
     void shouldDegradeOnMalformedJson() {
-        // 格式错误的 JSON 应该降级为默认 DTO
         String response = "{invalid json content";
 
         try {
@@ -192,7 +180,6 @@ class LlmMapTranslatorTest {
 
     @Test
     void shouldSanitizeInvalidRiskLevel() {
-        // 非法风险等级应该修正为 LOW
         String response = """
                 {
                     "intent": "文档更新",
@@ -217,7 +204,6 @@ class LlmMapTranslatorTest {
 
     @Test
     void shouldHandleEmptyTags() {
-        // 空标签列表应该默认为 CHORE
         String response = """
                 {
                     "intent": "格式调整",
@@ -236,6 +222,31 @@ class LlmMapTranslatorTest {
             assertNotNull(dto);
             assertEquals(1, dto.getTags().size());
             assertEquals("CHORE", dto.getTags().get(0));
+        } catch (Exception e) {
+            fail("测试失败: " + e.getMessage());
+        }
+    }
+
+    @Test
+    void shouldExtractJsonArrayFromResponse() {
+        String response = """
+                ```json
+                [
+                    {"hash": "abc1234", "intent": "修复登录", "tags": ["BUGFIX"], "risk_level": "HIGH", "message_quality": "GOOD"},
+                    {"hash": "def5678", "intent": "优化查询", "tags": ["PERF"], "risk_level": "LOW", "message_quality": "EXCELLENT"}
+                ]
+                ```
+                """;
+
+        try {
+            var method = LlmMapTranslator.class.getDeclaredMethod("extractJsonArray", String.class);
+            method.setAccessible(true);
+            String json = (String) method.invoke(translator, response);
+
+            assertTrue(json.startsWith("["));
+            assertTrue(json.contains("abc1234"));
+            assertTrue(json.contains("def5678"));
+            assertFalse(json.contains("```"));
         } catch (Exception e) {
             fail("测试失败: " + e.getMessage());
         }
