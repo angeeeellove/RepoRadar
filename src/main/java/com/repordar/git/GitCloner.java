@@ -15,14 +15,22 @@ import java.util.Comparator;
 /**
  * Git 仓库克隆与清理组件。
  * <p>
- * 支持远程 URL（git clone --bare）和本地路径两种方式。
+ * 支持远程 URL（bare 克隆）和本地路径两种方式。
  * 远程克隆到系统临时目录，分析完毕自动清理。
+ * 内置超时和重试机制，应对网络不稳定环境。
  *
  * @author frank
  */
 @Slf4j
 @Component
 public class GitCloner {
+
+    /** 克隆超时（秒） */
+    private static final int CLONE_TIMEOUT_SECONDS = 120;
+    /** 最大重试次数 */
+    private static final int MAX_RETRIES = 3;
+    /** 重试间隔基数（毫秒），实际间隔 = base * retryCount */
+    private static final long RETRY_DELAY_MS = 3000;
 
     /**
      * 克隆或打开仓库。
@@ -66,19 +74,59 @@ public class GitCloner {
                 || repoRef.endsWith(".git");
     }
 
+    /**
+     * 克隆远程仓库，带超时和重试。
+     * 使用 bare 模式（仅 .git 元数据，不含工作目录），减小传输量。
+     */
     private ClonedRepo cloneRemote(String url) throws GitAPIException, IOException {
         Path tempDir = Files.createTempDirectory("repordar-");
         log.info("克隆远程仓库: {} -> {}", url, tempDir);
 
-        Git git = Git.cloneRepository()
-                .setURI(url)
-                .setDirectory(tempDir.toFile())
-                .setCloneAllBranches(true)
-                .call();
-        Repository repository = git.getRepository();
-        git.close();
+        Exception lastException = null;
 
-        return new ClonedRepo(repository, tempDir, true);
+        for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                log.info("克隆尝试 {}/{}: {}", attempt, MAX_RETRIES, url);
+
+                Git git = Git.cloneRepository()
+                        .setURI(url)
+                        .setDirectory(tempDir.toFile())
+                        .setBare(true)
+                        .setCloneAllBranches(false)
+                        .setTimeout(CLONE_TIMEOUT_SECONDS)
+                        .call();
+
+                Repository repository = git.getRepository();
+                // 不调用 git.close()：它会同时 close Repository，
+                // 而 cleanup() 还会再 close 一次导致警告。
+                // Repository 由 cleanup() 统一关闭。
+
+                log.info("克隆成功: {}", url);
+                return new ClonedRepo(repository, tempDir, true);
+
+            } catch (Exception e) {
+                lastException = e;
+                log.warn("克隆失败 (尝试 {}/{}): {}", attempt, MAX_RETRIES, e.getMessage());
+
+                if (attempt < MAX_RETRIES) {
+                    long delay = RETRY_DELAY_MS * attempt;
+                    log.info("等待 {}ms 后重试...", delay);
+                    try {
+                        Thread.sleep(delay);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new IOException("克隆被中断", ie);
+                    }
+                }
+            }
+        }
+
+        // 所有重试都失败，清理临时目录
+        deleteTempDir(tempDir);
+        throw new IOException(
+                "克隆仓库失败（已重试 " + MAX_RETRIES + " 次）: " + url + " — "
+                        + (lastException != null ? lastException.getMessage() : "未知错误"),
+                lastException);
     }
 
     private ClonedRepo openLocal(String path) throws IOException {
