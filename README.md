@@ -24,7 +24,7 @@
 
 ### 架构亮点
 
-- **LLM 多厂商支持** — 自动识别 DeepSeek / OpenAI / GLM / Qwen / Moonshot，也可手动指定任意兼容 API
+- **LLM 多厂商支持** — 兼容 OpenAI 协议，理论上支持所有兼容 API 的模型；已在 DeepSeek 和智谱 GLM 上测试通过，其他厂商暂未验证
 - **优雅降级** — 不配 API Key 也能跑，纯规则分析保证基线功能
 - **代理自动检测** — 自动读取 `~/.gitconfig` 代理配置，和 `git clone` 体验一致
 - **单 JAR 零依赖** — `java -jar` 即跑，无需安装数据库或前端构建
@@ -86,6 +86,8 @@ java -jar target/repordar-1.0.0.jar https://github.com/your-org/your-repo.git \
 export HTTPS_PROXY=http://127.0.0.1:7890
 java -jar target/repordar-1.0.0.jar https://github.com/your-org/your-repo.git
 ```
+
+> ⚠️ 代理设置仅对 HTTPS 协议生效。SSH 协议（`git@github.com:...`）不受 HTTP 代理影响——如果你的 SSH 连接 GitHub 需要代理，请在 `~/.ssh/config` 中配置 `ProxyCommand`，或改用 HTTPS 地址。
 
 ### 接入 LLM（推荐）
 
