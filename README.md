@@ -27,7 +27,6 @@
 - **LLM 多厂商支持** — 自动识别 DeepSeek / OpenAI / GLM / Qwen / Moonshot，也可手动指定任意兼容 API
 - **优雅降级** — 不配 API Key 也能跑，纯规则分析保证基线功能
 - **代理自动检测** — 自动读取 `~/.gitconfig` 代理配置，和 `git clone` 体验一致
-- **实时进度** — 浏览器 SSE 推送，分析进度一目了然
 - **单 JAR 零依赖** — `java -jar` 即跑，无需安装数据库或前端构建
 
 ---
@@ -108,18 +107,11 @@ java -jar target/repordar-1.0.0.jar https://github.com/your-org/your-repo.git \
   --llm-model your-model
 ```
 
-启动后自动打开浏览器，实时展示分析进度：
+分析完成后会在终端输出报告路径：
 
 ```
 🔍 RepoRadar 开始分析: https://github.com/your-org/your-repo.git
-📡 LLM 配置: model=deepseek-chat, url=https://api.deepseek.com/v1
-
- CLONE ████████████░░░░ 30%  正在提取提交元数据...
- METADATA ██████████████░░ 50%  正在检测异常提交...
- LLM_MAP ████████████████ 80%  深度分析 5/8（a3f2c1d）...
- REPORT ████████████████ 100% ✅ 分析完成！
-
-报告: ./reports/repordar-your-repo-20260613-143052.html
+✅ 分析完成！报告: ./reports/repordar-your-repo-20260613-143052.html
 ```
 
 ### 完整参数
@@ -139,8 +131,6 @@ java -jar target/repordar-1.0.0.jar https://github.com/your-org/your-repo.git \
   --llm-base-url <url>     LLM API 基础 URL (自动推断可省略)
   --llm-model <name>       LLM 模型名称 (如 deepseek-chat, GLM-4-Flash)
   --proxy <url>            HTTP 代理 (如 http://127.0.0.1:7890)
-  --port <端口>            SSE 服务端口 (默认: 8080)
-  --no-browser             不自动打开浏览器
 ```
 
 ### 环境变量（替代 CLI 参数）

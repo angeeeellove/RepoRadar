@@ -45,3 +45,10 @@ application-local.yml
 # Claude 本地权限配置（含 allow/ask 规则）
 .claude/settings.json
 test-reports/
+
+# Claude 记忆与 MCP 缓存
+memory/
+.playwright-mcp/
+
+# 截图文件（非项目产出）
+*.png
